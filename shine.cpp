@@ -16,7 +16,7 @@ EOSIO_ABI(shine, (addpraise)(addvote)(calcrewards))
 
 //@abi action
 void shine::addpraise(const member_id& author, const member_id& praisee, const string& memo) {
-    // require_auth(_self);
+    require_auth(_self);
 
     auto praise_itr = praises.emplace(_self, [&](auto& praise) {
         praise.id = praises.available_primary_key();

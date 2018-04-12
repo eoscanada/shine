@@ -13,12 +13,7 @@ system based on praise and votes. Person (i.e. account) broadcast a praise
 to all other members. Each member (i.e. account) can then vote for this
 particular praise.
 
-At the start of each month, an amount of currency is being put as rewards.
-At the end of each month, the currency rewards are given to each account
-based on a function which calculates for each member the amount of reward
-for him based on number of votes received for his praises as well as number
-of votes he gave to other proportionally to the amount of all votes and
-praises on the system.
+TBC
 
 #### Actions
 

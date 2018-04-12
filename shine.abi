@@ -1,0 +1,200 @@
+{
+  "types": [{
+    "new_type_name": "member_id",
+    "type": "checksum256"
+  }],
+  "structs": [{
+      "name": "praise",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        }, {
+          "name": "author",
+          "type": "member_id"
+        }, {
+          "name": "praisee",
+          "type": "member_id"
+        }, {
+          "name": "memo",
+          "type": "string"
+        }
+      ]
+    }, {
+      "name": "vote",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        }, {
+          "name": "praise_id",
+          "type": "uint64"
+        }, {
+          "name": "voter",
+          "type": "member_id"
+        }
+      ]
+    }, {
+      "name": "member_stat",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        }, {
+          "name": "member",
+          "type": "member_id"
+        }, {
+          "name": "praise_posted",
+          "type": "uint64"
+        }, {
+          "name": "praise_vote_received",
+          "type": "uint64"
+        }, {
+          "name": "vote_given_explicit",
+          "type": "uint64"
+        }, {
+          "name": "vote_received_implicit",
+          "type": "uint64"
+        }, {
+          "name": "vote_received_explicit",
+          "type": "uint64"
+        }
+      ]
+    }, {
+      "name": "global_stat",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        }, {
+          "name": "vote_implicit",
+          "type": "uint64"
+        }, {
+          "name": "vote_explicit",
+          "type": "uint64"
+        }
+      ]
+    }, {
+      "name": "reward",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        }, {
+          "name": "member",
+          "type": "member_id"
+        }, {
+          "name": "amount_praise_posted",
+          "type": "float64"
+        }, {
+          "name": "amount_vote_received",
+          "type": "float64"
+        }, {
+          "name": "amount_vote_given",
+          "type": "float64"
+        }, {
+          "name": "amount_total",
+          "type": "float64"
+        }
+      ]
+    },
+
+    {
+      "name": "addpraise",
+      "base": "",
+      "fields": [{
+          "name": "author",
+          "type": "member_id"
+        }, {
+          "name": "praisee",
+          "type": "member_id"
+        }, {
+          "name": "memo",
+          "type": "string"
+        }
+      ]
+    }, {
+      "name": "addvote",
+      "base": "",
+      "fields": [{
+          "name": "praise_id",
+          "type": "uint64"
+        }, {
+          "name": "voter",
+          "type": "member_id"
+        }
+      ]
+    }, {
+      "name": "calcrewards",
+      "base": "",
+      "fields": [{
+          "name": "pot",
+          "type": "asset"
+        }
+      ]
+    },
+  ],
+  "actions": [{
+      "name": "addpraise",
+      "type": "addpraise"
+    }, {
+      "name": "addvote",
+      "type": "addvote"
+    }, {
+      "name": "calcrewards",
+      "type": "calcrewards"
+    }
+  ],
+  "tables": [{
+      "name": "praisesl",
+      "index_type": "i64",
+      "key_names": [
+        "id"
+      ],
+      "key_types": [
+        "uint64"
+      ],
+      "type": "praise"
+    }, {
+      "name": "votesl",
+      "index_type": "i64",
+      "key_names": [
+        "id"
+      ],
+      "key_types": [
+        "uint64"
+      ],
+      "type": "vote"
+    }, {
+      "name": "memberstatsl",
+      "index_type": "i64",
+      "key_names": [
+        "id"
+      ],
+      "key_types": [
+        "uint64"
+      ],
+      "type": "member_stat"
+    }, {
+      "name": "globalstatsl",
+      "index_type": "i64",
+      "key_names": [
+        "id"
+      ],
+      "key_types": [
+        "uint64"
+      ],
+      "type": "global_stat"
+    }, {
+      "name": "rewardsl",
+      "index_type": "i64",
+      "key_names": [
+        "id"
+      ],
+      "key_types": [
+        "uint64"
+      ],
+      "type": "reward"
+    }
+  ]
+}

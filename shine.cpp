@@ -1,5 +1,7 @@
 #include "shine.hpp";
 
+const asset_symbol shine::EOS_SYMBOL = S(CURRENCY_PRECISION, EOS);
+
 /**
  * Macro that auto-create the `apply` SmartContract C entrypoint
  * by matching the action received based on the list of action in the
@@ -14,7 +16,7 @@ EOSIO_ABI(shine, (addpraise)(addvote)(calcrewards))
 
 //@abi action
 void shine::addpraise(const member_id& author, const member_id& praisee, const string& memo) {
-    require_auth(_self);
+    // require_auth(_self);
 
     auto praise_itr = praises.emplace(_self, [&](auto& praise) {
         praise.id = praises.available_primary_key();
@@ -75,18 +77,16 @@ void shine::addvote(const uint64_t praise_id, const member_id& voter) {
 
 void shine::calcrewards(const asset& pot) {
     auto symbol = pot.symbol;
-
-    // FIXME Ensure that symbol is EOS, currently tested
-    //  symbol == S(4,EOS), symbol.name() == S(4,EOS)
-    eosio_assert(symbol.is_valid(), "pot currency should be EOS");
+    eosio_assert(symbol.is_valid() && symbol == EOS_SYMBOL, "pot currency should be EOS with precision 4");
 
     auto global_stats_itr = global_stats.find(GLOBAL_STAT_ID);
     eosio_assert(global_stats_itr != global_stats.end(), "cannot compute rewards without any praise");
 
-    auto amount = pot.amount;
+    auto pot_amount = asset_to_double(pot);
     auto vote_implicit = global_stats_itr->vote_implicit;
     auto vote_explicit = global_stats_itr->vote_explicit;
     auto vote_total = vote_implicit + vote_explicit;
+
 
     // This loop through all stats giving 2N iterations. Ideally, this could
     // probably eliminated somehow. At least, computation of `compute_vote_given_weight`
@@ -105,9 +105,9 @@ void shine::calcrewards(const asset& pot) {
         auto praise_posted_weight = praise_vote_received / (double) vote_explicit;
         auto vote_given_weight = vote_given_weighted / vote_given_weighted_total;
 
-        auto vote_received_amount = vote_received_weight * amount * REWARD_VOTE_RECEIVED_PORTION;
-        auto praise_posted_amount = praise_posted_weight * amount * REWARD_PRAISE_POSTED_PORTION;
-        auto vote_given_amount = vote_given_weight * amount * REWARD_VOTE_GIVEN_PORTION;
+        auto vote_received_amount = double_to_asset(vote_received_weight * pot_amount * REWARD_VOTE_RECEIVED_WEIGHT);
+        auto praise_posted_amount = double_to_asset(praise_posted_weight * pot_amount * REWARD_PRAISE_POSTED_WEIGHT);
+        auto vote_given_amount = double_to_asset(vote_given_weight * pot_amount * REWARD_VOTE_GIVEN_WEIGHT);
         auto amount_total = vote_received_amount + praise_posted_amount + vote_given_amount;
 
         update_reward_for_member(stats.id, stats.member, [&](auto& reward) {

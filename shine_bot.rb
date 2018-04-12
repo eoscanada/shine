@@ -167,7 +167,7 @@ def perform_rewards(prompt, context)
   action = 'calcrewards'
   contract = context[:contract]
   data = {
-    pot: "500 EOS",
+    pot: ask_reward_pot(prompt, context),
   }
 
   puts execute_cleos([
@@ -179,6 +179,17 @@ def perform_rewards(prompt, context)
     '--permission',
     "#{contract}@active"
   ])
+end
+
+def ask_reward_pot(prompt, context)
+  default = ENV['SHINE_BOT_REWARD_POT']
+  return default if default && context[:quick_run]
+
+  prompt.ask('Pot:') do |question|
+    question.required true
+    question.default default || '500.0000 EOS'
+    question.validate /^[0-9]+.[0-9]{4} EOS$/
+  end
 end
 
 def ask_member_id(prompt, text, default, context)

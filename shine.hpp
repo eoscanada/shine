@@ -15,13 +15,17 @@
 #include <eosio.system/eosio.system.hpp>
 
 // Configurable values
+#define CURRENCY_PRECISION 4
+
 #define GLOBAL_STAT_ID 0
-#define REWARD_VOTE_RECEIVED_PORTION 0.9
-#define REWARD_VOTE_GIVEN_PORTION 0.03
-#define REWARD_PRAISE_POSTED_PORTION 0.07
+
+#define REWARD_PRAISE_POSTED_WEIGHT 0.07
+#define REWARD_VOTE_RECEIVED_WEIGHT 0.9
+#define REWARD_VOTE_GIVEN_WEIGHT 0.03
 
 // Macro
-#define TABLE(X) ::eosio::string_to_name(#X)
+#define TABLE_VERSIONNED(X, VERSION) ::eosio::string_to_name(#X #VERSION)
+#define TABLE(X) TABLE_VERSIONNED(X, m)
 
 typedef checksum256 member_id;
 
@@ -67,7 +71,7 @@ class shine : public eosio::contract
         EOSLIB_SERIALIZE(praise, (id)(author)(praisee)(memo))
     };
 
-    typedef eosio::multi_index<TABLE(praisesl), praise> praises_index;
+    typedef eosio::multi_index<TABLE(praises), praise> praises_index;
 
     //@abi table votes i64
     struct vote
@@ -81,7 +85,7 @@ class shine : public eosio::contract
         EOSLIB_SERIALIZE(vote, (id)(praise_id)(voter))
     };
 
-    typedef eosio::multi_index<TABLE(votesl), vote> votes_index;
+    typedef eosio::multi_index<TABLE(votes), vote> votes_index;
 
     //@abi table memberstats i64
     /**
@@ -115,7 +119,7 @@ class shine : public eosio::contract
         EOSLIB_SERIALIZE(member_stat, (id)(member)(praise_posted)(praise_vote_received)(vote_given_explicit)(vote_received_implicit)(vote_received_explicit))
     };
 
-    typedef eosio::multi_index<TABLE(memberstatsl), member_stat,
+    typedef eosio::multi_index<TABLE(memberstats), member_stat,
       indexed_by< N(member), const_mem_fun<member_stat, key256, &member_stat::by_member>>
     > member_stats_index;
 
@@ -131,24 +135,34 @@ class shine : public eosio::contract
         EOSLIB_SERIALIZE(global_stat, (id)(vote_implicit)(vote_explicit))
     };
 
-    typedef eosio::multi_index<TABLE(globalstatsl), global_stat> global_stats_index;
+    typedef eosio::multi_index<TABLE(globalstats), global_stat> global_stats_index;
 
     //@abi table rewards i64
     struct reward
     {
         uint64_t id;
         member_id member;
-        double amount_praise_posted;
-        double amount_vote_received;
-        double amount_vote_given;
-        double amount_total;
+        asset amount_praise_posted;
+        asset amount_vote_received;
+        asset amount_vote_given;
+        asset amount_total;
 
         uint64_t primary_key() const { return id; }
 
         EOSLIB_SERIALIZE(reward, (id)(member)(amount_praise_posted)(amount_vote_received)(amount_vote_given)(amount_total))
     };
 
-    typedef eosio::multi_index<TABLE(rewardsl), reward> rewards_index;
+    typedef eosio::multi_index<TABLE(rewards), reward> rewards_index;
+
+    static const asset_symbol EOS_SYMBOL;
+
+    inline static asset double_to_asset(double amount) {
+        return asset((uint64_t) (pow(10, CURRENCY_PRECISION) * amount), EOS_SYMBOL);
+    }
+
+    inline static double asset_to_double(const asset& asset) {
+        return asset.amount / pow(10, CURRENCY_PRECISION);
+    }
 
     static key256 compute_member_id_key(const member_id& member_id)
     {
@@ -158,18 +172,17 @@ class shine : public eosio::contract
 
     static double compute_vote_given_weight(uint64_t vote_given) {
       if (vote_given <= 0) return 0;
-      if (vote_given <= 1) return 0.333333333;
-      if (vote_given <= 2) return 0.666666666;
+      if (vote_given <= 1) return 1 / 3.0;
+      if (vote_given <= 2) return 2 / 3.0;
 
       return 1.0;
     }
 
-    bool has_praise(const uint64_t praise_id) const
-    {
+    double compute_vote_given_weighted_total() const;
+
+    bool has_praise(const uint64_t praise_id) const {
         return praises.find(praise_id) != praises.end();
     }
-
-    double compute_vote_given_weighted_total() const;
 
     void update_global_stat(const std::function<void(global_stat&)> updater);
 

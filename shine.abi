@@ -85,16 +85,16 @@
           "type": "member_id"
         }, {
           "name": "amount_praise_posted",
-          "type": "float64"
+          "type": "asset"
         }, {
           "name": "amount_vote_received",
-          "type": "float64"
+          "type": "asset"
         }, {
           "name": "amount_vote_given",
-          "type": "float64"
+          "type": "asset"
         }, {
           "name": "amount_total",
-          "type": "float64"
+          "type": "asset"
         }
       ]
     },
@@ -146,7 +146,7 @@
     }
   ],
   "tables": [{
-      "name": "praisesl",
+      "name": "praisesm",
       "index_type": "i64",
       "key_names": [
         "id"
@@ -156,7 +156,7 @@
       ],
       "type": "praise"
     }, {
-      "name": "votesl",
+      "name": "votesm",
       "index_type": "i64",
       "key_names": [
         "id"
@@ -166,7 +166,7 @@
       ],
       "type": "vote"
     }, {
-      "name": "memberstatsl",
+      "name": "memberstatsm",
       "index_type": "i64",
       "key_names": [
         "id"
@@ -176,7 +176,7 @@
       ],
       "type": "member_stat"
     }, {
-      "name": "globalstatsl",
+      "name": "globalstatsm",
       "index_type": "i64",
       "key_names": [
         "id"
@@ -186,7 +186,7 @@
       ],
       "type": "global_stat"
     }, {
-      "name": "rewardsl",
+      "name": "rewardsm",
       "index_type": "i64",
       "key_names": [
         "id"

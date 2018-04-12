@@ -95,14 +95,14 @@ the `eosiocpp` command line utility. Navigate to the root folder
 of this project and then issue:
 
 ```
-eosiocpp -o contracts/shine/shine.wast contracts/shine/shine.cpp
+eosiocpp -o shine.wast shine.cpp
 ```
 
 Once the WAST has been generated correctly, next step is to set the contract
 on the account `shine` that was created in the preparation step:
 
 ```
-cleos set contract shine contracts/shine
+cleos set contract shine .
 ```
 
 ##### Testing

@@ -13,7 +13,7 @@ def main(arguments)
 
   context[:arguments] = arguments
   context[:quick_run] = arguments_any?(arguments, '-q', '--quick')
-  context[:contract] = ask_contract(prompt, context)
+  context[:contract] = ask_contract(prompt)
   context[:action] = ask_action(prompt, context)
 
   send("perform_#{context[:action]}".to_sym, prompt, context)
@@ -127,7 +127,7 @@ end
 
 def perform_vote(prompt, context)
   vote = {
-    praise_id: ask_praise_id(prompt),
+    praise_id: ask_praise_id(prompt, context),
     voter: ask_member_id(prompt, 'Voter:', ENV['SHINE_BOT_VOTER'], context),
   }
 

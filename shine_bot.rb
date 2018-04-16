@@ -37,6 +37,8 @@ def ask_action(prompt, context)
     menu.choice 'Praise', :praise
     menu.choice 'Vote', :vote
     menu.choice 'Rewards', :rewards
+    menu.choice 'Bind Member', :bind_member
+    menu.choice 'Clear', :clear
     menu.choice 'Scenario', :scenario
   end
 end
@@ -73,8 +75,6 @@ def perform_scenario(_prompt, context)
       praisee: sha256(praise[:praisee]),
       memo: "#{praise[:author]} -> #{praise[:praisee]}",
     })
-
-    sleep(1)
   end
 
   votes.each do |vote|
@@ -82,15 +82,13 @@ def perform_scenario(_prompt, context)
       praise_id: vote[:praise_id],
       voter: sha256(vote[:voter]),
     })
-
-    sleep(1)
   end
 end
 
 def perform_praise(prompt, context)
   praise = {
-    author: ask_member_id(prompt, 'Author:', ENV['SHINE_BOT_AUTHOR'], context),
-    praisee: ask_member_id(prompt, 'Praisee:', ENV['SHINE_BOT_PRAISEE'], context),
+    author: ask_member_id(prompt, context, 'Author:', ENV['SHINE_BOT_AUTHOR']),
+    praisee: ask_member_id(prompt, context, 'Praisee:', ENV['SHINE_BOT_PRAISEE']),
     memo: ask_memo(prompt, context),
   }
 
@@ -102,17 +100,7 @@ def perform_praise(prompt, context)
 end
 
 def execute_praise(contract, praise)
-  action = 'addpraise'
-
-  execute_cleos([
-    'push',
-    'action',
-    contract,
-    action,
-    JSON.generate(praise),
-    '--permission',
-    "#{contract}@active"
-  ])
+  execute_transaction(contract, 'addpraise', JSON.generate(praise))
 end
 
 def ask_memo(prompt, context)
@@ -128,7 +116,7 @@ end
 def perform_vote(prompt, context)
   vote = {
     praise_id: ask_praise_id(prompt, context),
-    voter: ask_member_id(prompt, 'Voter:', ENV['SHINE_BOT_VOTER'], context),
+    voter: ask_member_id(prompt, context, 'Voter:', ENV['SHINE_BOT_VOTER']),
   }
 
   puts 'Data:'
@@ -139,17 +127,7 @@ def perform_vote(prompt, context)
 end
 
 def execute_vote(contract, vote)
-  action = 'addvote'
-
-  execute_cleos([
-    'push',
-    'action',
-    contract,
-    action,
-    JSON.generate(vote),
-    '--permission',
-    "#{contract}@active"
-  ])
+  execute_transaction(contract, 'addvote', JSON.generate(vote))
 end
 
 def ask_praise_id(prompt, context)
@@ -163,22 +141,17 @@ def ask_praise_id(prompt, context)
   end
 end
 
-def perform_rewards(prompt, context)
-  action = 'calcrewards'
-  contract = context[:contract]
-  data = {
-    pot: ask_reward_pot(prompt, context),
-  }
+def perform_bind_member(prompt, context)
+  puts execute_transaction(context[:contract], 'bindmember', JSON.generate({
+    member: ask_member_id(prompt, context, 'Member:', ENV['SHINE_BOT_BIND_MEMBER']),
+    account: ask_account(prompt, context, 'Account:', ENV['SHINE_BOT_BIND_ACCOUNT']),
+  }))
+end
 
-  puts execute_cleos([
-    'push',
-    'action',
-    contract,
-    action,
-    JSON.generate(data),
-    '--permission',
-    "#{contract}@active"
-  ])
+def perform_rewards(prompt, context)
+  puts execute_transaction(context[:contract], 'calcrewards', JSON.generate({
+    pot: ask_reward_pot(prompt, context),
+  }))
 end
 
 def ask_reward_pot(prompt, context)
@@ -192,7 +165,21 @@ def ask_reward_pot(prompt, context)
   end
 end
 
-def ask_member_id(prompt, text, default, context)
+def perform_clear(_prompt, context)
+  puts execute_transaction(context[:contract], 'clear', JSON.generate({ any: 0 }))
+end
+
+def ask_account(prompt, context, text, default = nil)
+  return default if default && context[:quick_run]
+
+  prompt.ask(text) do |question|
+    question.required true
+    question.default default
+    question.validate EOS_NAME_REGEX
+  end
+end
+
+def ask_member_id(prompt, context, text, default)
   return sha256(default) if default && context[:quick_run]
 
   prompt.ask(text) do |question|
@@ -210,13 +197,35 @@ def extract_default_action(arguments)
   return :praise if arguments_any?(arguments, '--praise', '-p')
   return :vote if arguments_any?(arguments, '--vote', '-v')
   return :rewards if arguments_any?(arguments, '--rewards', '-r')
+  return :bind_member if arguments_any?(arguments, '--member', '-m')
+  return :clear if arguments_any?(arguments, '--clear', '-c')
   return :scenario if arguments_any?(arguments, '--scenario')
 
-  ENV['SHINE_BOT_ACTION'].nil? ? :praise : ENV['SHINE_BOT_ACTION'].to_sym
+  ENV['SHINE_BOT_ACTION'].nil? ? nil : ENV['SHINE_BOT_ACTION'].to_sym
+end
+
+def execute_transaction(contract, action, data)
+  execute_cleos([
+    'push',
+    'action',
+    contract,
+    action,
+    data,
+    '--force-unique',
+    '--permission',
+    "#{contract}@active"
+  ])
 end
 
 def execute_cleos(arguments)
-  stdout, stderr, status = Open3.capture3('cleos', *arguments)
+  wallet_host = ENV['SHINE_BOT_WALLET_HOST']
+  wallet_port = ENV['SHINE_BOT_WALLET_PORT']
+
+  options = []
+  options << '--wallet-port' << wallet_port if wallet_port
+  options << '--wallet-host' << wallet_host if wallet_host
+
+  stdout, stderr, status = Open3.capture3('cleos', *options, *arguments)
   unless status.success?
     puts stderr
     exit(status.exitstatus)

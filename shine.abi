@@ -4,6 +4,17 @@
     "type": "checksum256"
   }],
   "structs": [{
+      "name": "account",
+      "base": "",
+      "fields": [{
+          "name": "id",
+          "type": "uint64"
+        }, {
+          "name": "member",
+          "type": "member_id"
+        }
+      ]
+    }, {
       "name": "praise",
       "base": "",
       "fields": [{
@@ -132,6 +143,25 @@
           "type": "asset"
         }
       ]
+    }, {
+      "name": "bindmember",
+      "base": "",
+      "fields": [{
+          "name": "member",
+          "type": "member_id"
+        }, {
+          "name": "account",
+          "type": "account_name"
+        }
+      ]
+    }, {
+      "name": "clear",
+      "base": "",
+      "fields": [{
+          "name": "any",
+          "type": "uint64"
+        }
+      ]
     },
   ],
   "actions": [{
@@ -143,10 +173,26 @@
     }, {
       "name": "calcrewards",
       "type": "calcrewards"
+    }, {
+      "name": "bindmember",
+      "type": "bindmember"
+    }, {
+      "name": "clear",
+      "type": "clear"
     }
   ],
   "tables": [{
-      "name": "praisesm",
+      "name": "accounts",
+      "index_type": "i64",
+      "key_names": [
+        "id"
+      ],
+      "key_types": [
+        "uint64"
+      ],
+      "type": "account"
+    }, {
+      "name": "praises",
       "index_type": "i64",
       "key_names": [
         "id"
@@ -156,7 +202,7 @@
       ],
       "type": "praise"
     }, {
-      "name": "votesm",
+      "name": "votes",
       "index_type": "i64",
       "key_names": [
         "id"
@@ -166,7 +212,7 @@
       ],
       "type": "vote"
     }, {
-      "name": "memberstatsm",
+      "name": "memberstats",
       "index_type": "i64",
       "key_names": [
         "id"
@@ -176,7 +222,7 @@
       ],
       "type": "member_stat"
     }, {
-      "name": "globalstatsm",
+      "name": "globalstats",
       "index_type": "i64",
       "key_names": [
         "id"
@@ -186,7 +232,7 @@
       ],
       "type": "global_stat"
     }, {
-      "name": "rewardsm",
+      "name": "rewards",
       "index_type": "i64",
       "key_names": [
         "id"

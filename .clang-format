@@ -1,0 +1,8 @@
+BasedOnStyle: Google
+ColumnLimit: 120
+UseTab: false
+IndentWidth: 2
+DerivePointerAlignment: false
+PointerAlignment: Left
+BraceWrapping:
+  AfterStruct: false

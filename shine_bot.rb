@@ -36,9 +36,8 @@ def ask_action(prompt, context)
   prompt.select('Action') do |menu|
     menu.choice 'Praise', :praise
     menu.choice 'Vote', :vote
-    menu.choice 'Rewards', :rewards
     menu.choice 'Bind Member', :bind_member
-    menu.choice 'Transfer', :transfer
+    menu.choice 'Unbind Member', :unbind_member
     menu.choice 'Reset', :reset
     menu.choice 'Clear', :clear
     menu.choice 'Scenario', :scenario
@@ -150,26 +149,9 @@ def perform_bind_member(prompt, context)
   }))
 end
 
-def perform_rewards(prompt, context)
-  puts execute_transaction(context[:contract], 'calcrewards', JSON.generate({
-    pot: ask_reward_pot(prompt, context),
-  }))
-end
-
-def ask_reward_pot(prompt, context)
-  default = ENV['SHINE_BOT_REWARD_POT']
-  return default if default && context[:quick_run]
-
-  prompt.ask('Pot:') do |question|
-    question.required true
-    question.default default || '500.0000 EOS'
-    question.validate /^[0-9]+.[0-9]{4} EOS$/
-  end
-end
-
-def perform_transfer(prompt, context)
-  puts execute_transaction(context[:contract], 'transfer', JSON.generate({
-    pot: ask_reward_pot(prompt, context),
+def perform_unbind_member(prompt, context)
+  puts execute_transaction(context[:contract], 'unbindmember', JSON.generate({
+    member: ask_member_id(prompt, context, 'Member:', ENV['SHINE_BOT_UNBIND_MEMBER']),
   }))
 end
 
@@ -208,9 +190,8 @@ end
 def extract_default_action(arguments)
   return :praise if arguments_any?(arguments, '--praise')
   return :vote if arguments_any?(arguments, '--vote')
-  return :rewards if arguments_any?(arguments, '--rewards')
   return :bind_member if arguments_any?(arguments, '--bind-member')
-  return :transfer if arguments_any?(arguments, '--transfer')
+  return :unbind_member if arguments_any?(arguments, '--unbind-member')
   return :reset if arguments_any?(arguments, '--reset')
   return :clear if arguments_any?(arguments, '--clear')
   return :scenario if arguments_any?(arguments, '--scenario')

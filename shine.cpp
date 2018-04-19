@@ -28,7 +28,7 @@ extern "C" {
       // Don't rename `thiscontract`, it's being use verbatim in `EOSIO_API` macro
       shine thiscontract(self);
       switch (action) {
-        EOSIO_API(shine, (addpraise)(addvote)(calcrewards)(bindmember)(transfer)(reset)(clear))
+        EOSIO_API(shine, (addpraise)(addvote)(bindmember)(unbindmember)(reset)(clear))
       }
 
       eosio_exit(0);
@@ -47,9 +47,12 @@ extern "C" {
   }
 }
 
-//@abi action
+///
+//// Actions
+///
+
 void shine::addpraise(const member_id& author, const member_id& praisee, const string& memo) {
-  require_shine_active_auth();
+  // require_shine_active_auth();
 
   auto praise_itr = praises.emplace(_self, [&](auto& praise) {
     praise.id = praises.available_primary_key();
@@ -63,7 +66,6 @@ void shine::addpraise(const member_id& author, const member_id& praisee, const s
   update_global_stat([](auto& global_stat) { global_stat.vote_implicit += 1; });
 }
 
-//@abi action
 void shine::addvote(const uint64_t praise_id, const member_id& voter) {
   require_shine_active_auth();
 
@@ -80,64 +82,6 @@ void shine::addvote(const uint64_t praise_id, const member_id& voter) {
   update_member_stat(praise_itr->praisee, [](auto& stat) { stat.vote_received_explicit += 1; });
   update_member_stat(praise_itr->author, [](auto& stat) { stat.praise_vote_received += 1; });
   update_global_stat([](auto& global_stat) { global_stat.vote_explicit += 1; });
-}
-
-/**
- * The calculation of rewards follow a simple algorithm using as raw input
- * for each member:
- *  + The amount of vote received
- *  + The amount of vote given
- *  + The amount of praise posted
- *
- * Base on these three values, a weight is computed for each of them:
- *  + Vote received -> Proportional to total vote count (explicit + implicit)
- *  + Vote given -> Proportional to total of vote given weight (1 vote -> 1/3, 2 votes -> 2/3, 2+ votes -> 3/3)
- *  + Praise posted -> Propotional to total explicite vote count
- */
-void shine::calcrewards(const asset& pot) {
-  require_shine_active_auth();
-
-  auto symbol = pot.symbol;
-  eosio_assert(symbol.is_valid() && symbol == EOS_SYMBOL, "pot currency should be EOS with precision 4");
-
-  auto global_stats_itr = global_stats.find(GLOBAL_STAT_ID);
-  eosio_assert(global_stats_itr != global_stats.end(), "cannot compute rewards without any praise");
-
-  auto pot_amount = asset_to_double(pot);
-  auto vote_implicit = global_stats_itr->vote_implicit;
-  auto vote_explicit = global_stats_itr->vote_explicit;
-  auto vote_total = vote_implicit + vote_explicit;
-
-  // This loop through all stats giving 2N iterations. Ideally, this could
-  // probably eliminated somehow. At least, computation of
-  // `compute_vote_given_weight` could be cached so it would not be redo in the
-  // second loop that follows.
-  auto vote_given_weighted_total = compute_vote_given_weighted_total();
-
-  std::for_each(stats.begin(), stats.end(), [&](auto& stats) {
-    auto vote_received = stats.vote_received_explicit + stats.vote_received_implicit;
-    auto praise_vote_received = stats.praise_vote_received;
-    auto vote_given = stats.vote_given_explicit;
-
-    auto vote_given_weights = compute_vote_given_weight(vote_given);
-    auto vote_given_weighted = vote_given * vote_given_weights;
-
-    auto vote_received_weight = vote_received / (double)vote_total;
-    auto praise_posted_weight = praise_vote_received / (double)vote_explicit;
-    auto vote_given_weight = vote_given_weighted / vote_given_weighted_total;
-
-    auto vote_received_amount = double_to_asset(vote_received_weight * pot_amount * REWARD_VOTE_RECEIVED_WEIGHT);
-    auto praise_posted_amount = double_to_asset(praise_posted_weight * pot_amount * REWARD_PRAISE_POSTED_WEIGHT);
-    auto vote_given_amount = double_to_asset(vote_given_weight * pot_amount * REWARD_VOTE_GIVEN_WEIGHT);
-    auto amount_total = vote_received_amount + praise_posted_amount + vote_given_amount;
-
-    update_reward_for_member(stats.id, stats.member, [&](auto& reward) {
-      reward.amount_praise_posted = praise_posted_amount;
-      reward.amount_vote_received = vote_received_amount;
-      reward.amount_vote_given = vote_given_amount;
-      reward.amount_total = amount_total;
-    });
-  });
 }
 
 /**
@@ -181,25 +125,17 @@ void shine::bindmember(const member_id& member, const account_name account_id) {
 }
 
 /**
- * Transfer actual rewards to
+ * Removes the actual association between an EOS account and
+ * a member.
  */
-void shine::transfer(const asset& pot) {
+void shine::unbindmember(const member_id& member) {
   require_shine_active_auth();
 
-  calcrewards(pot);
-  eosio_assert(has_rewards(), "cannot transfer pot without any rewards");
-
-  std::for_each(rewards.begin(), rewards.end(), [&](auto& reward) {
-    auto account_member_index = accounts.template get_index<N(member)>();
-    auto account_member_itr = account_member_index.find(compute_member_id_key(reward.member));
-    if (account_member_itr == account_member_index.end()) {
-      eosio::print("No mapping from member to account name, no reward to transfer.");
-      return;
-    }
-
-    eosio::token_transfer transfer{_self, account_member_itr->id, reward.amount_total, ""};
-    eosio::action(permission_level{_self, N(active)}, N(eosio.token), N(transfer), transfer).send();
-  });
+  auto member_account_index = accounts.template get_index<N(member)>();
+  auto member_itr = member_account_index.find(compute_member_id_key(member));
+  if (member_itr != member_account_index.end()) {
+    member_account_index.erase(member_itr);
+  }
 }
 
 /**
@@ -227,6 +163,90 @@ void shine::clear(const uint64_t any) {
   table::clear(accounts);
   reset(any);
 }
+
+///
+//// Notifications
+///
+
+/**
+ * Transfer the actual pot into rewards to all members.
+ */
+void shine::transfer(const asset& pot) {
+  compute_rewards(pot);
+  eosio_assert(has_rewards(), "cannot transfer pot without any rewards");
+
+  std::for_each(rewards.begin(), rewards.end(), [&](auto& reward) {
+    auto account_member_index = accounts.template get_index<N(member)>();
+    auto account_member_itr = account_member_index.find(compute_member_id_key(reward.member));
+    if (account_member_itr == account_member_index.end()) {
+      eosio::print("No mapping from member to account name, no reward to transfer.");
+      return;
+    }
+
+    eosio::token_transfer transfer{_self, account_member_itr->id, reward.amount_total, ""};
+    eosio::action(permission_level{_self, N(active)}, N(eosio.token), N(transfer), transfer).send();
+  });
+}
+
+/**
+ * The calculation of rewards follow a simple algorithm using as raw input
+ * for each member:
+ *  + The amount of vote received
+ *  + The amount of vote given
+ *  + The amount of praise posted
+ *
+ * Base on these three values, a weight is computed for each of them:
+ *  + Vote received -> Proportional to total vote count (explicit + implicit)
+ *  + Vote given -> Proportional to total of vote given weight (1 vote -> 1/3, 2 votes -> 2/3, 2+ votes -> 3/3)
+ *  + Praise posted -> Propotional to total explicite vote count
+ */
+void shine::compute_rewards(const asset& pot) {
+  auto symbol = pot.symbol;
+  eosio_assert(symbol.is_valid() && symbol == EOS_SYMBOL, "pot currency should be EOS with precision 4");
+
+  auto global_stats_itr = global_stats.find(GLOBAL_STAT_ID);
+  eosio_assert(global_stats_itr != global_stats.end(), "cannot compute rewards without any praise");
+
+  auto pot_amount = asset_to_double(pot);
+  auto vote_implicit = global_stats_itr->vote_implicit;
+  auto vote_explicit = global_stats_itr->vote_explicit;
+  auto vote_total = vote_implicit + vote_explicit;
+
+  // This loop through all stats giving 2N iterations. Ideally, this could
+  // probably eliminated somehow. At least, computation of
+  // `compute_vote_given_weight` could be cached so it would not be redo in the
+  // second loop that follows.
+  auto vote_given_weighted_total = compute_vote_given_weighted_total();
+
+  std::for_each(stats.begin(), stats.end(), [&](auto& stats) {
+    auto vote_received = stats.vote_received_explicit + stats.vote_received_implicit;
+    auto praise_vote_received = stats.praise_vote_received;
+    auto vote_given = stats.vote_given_explicit;
+
+    auto vote_given_weights = compute_vote_given_weight(vote_given);
+    auto vote_given_weighted = vote_given * vote_given_weights;
+
+    auto vote_received_weight = vote_received / (double)vote_total;
+    auto praise_posted_weight = praise_vote_received / (double)vote_explicit;
+    auto vote_given_weight = vote_given_weighted / vote_given_weighted_total;
+
+    auto vote_received_amount = double_to_asset(vote_received_weight * pot_amount * REWARD_VOTE_RECEIVED_WEIGHT);
+    auto praise_posted_amount = double_to_asset(praise_posted_weight * pot_amount * REWARD_PRAISE_POSTED_WEIGHT);
+    auto vote_given_amount = double_to_asset(vote_given_weight * pot_amount * REWARD_VOTE_GIVEN_WEIGHT);
+    auto amount_total = vote_received_amount + praise_posted_amount + vote_given_amount;
+
+    update_reward_for_member(stats.id, stats.member, [&](auto& reward) {
+      reward.amount_praise_posted = praise_posted_amount;
+      reward.amount_vote_received = vote_received_amount;
+      reward.amount_vote_given = vote_given_amount;
+      reward.amount_total = amount_total;
+    });
+  });
+}
+
+///
+//// Helpers
+///
 
 double shine::compute_vote_given_weighted_total() const {
   auto vote_given_weighted_total = 0.0;

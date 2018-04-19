@@ -6,10 +6,10 @@
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/fixed_key.hpp>
 
-
-// Configurable values
+// Constants
 #define GLOBAL_STAT_ID 0
 
+// Configurable values
 #define REWARD_PRAISE_POSTED_WEIGHT 0.07
 #define REWARD_VOTE_RECEIVED_WEIGHT 0.9
 #define REWARD_VOTE_GIVEN_WEIGHT 0.03
@@ -60,29 +60,20 @@ class shine : public eosio::contract {
         global_stats(contract_account, contract_account),
         rewards(contract_account, contract_account) {}
 
-  //@abi action
+  // Actions
+
   void addpraise(const member_id& author, const member_id& praisee, const string& memo);
-
-  //@abi action
   void addvote(const uint64_t praise_id, const member_id& voter);
-
-  //@abi action
-  void calcrewards(const asset& pot);
-
-  //@abi action
   void bindmember(const member_id& member, const account_name account);
-
-  //@abi action
-  void transfer(const asset& pot);
-
-  //@abi action
+  void unbindmember(const member_id& member);
   void reset(const uint64_t any);
-
-  //@abi action
   void clear(const uint64_t any);
 
+  // Notifications
+  void transfer(const asset& pot);
+
  private:
-  //@abi table accounts i64
+   //@abi table accounts i64
   struct account {
     account_name id;
     member_id member;
@@ -214,6 +205,8 @@ class shine : public eosio::contract {
   }
 
   double compute_vote_given_weighted_total() const;
+
+  void compute_rewards(const asset& pot);
 
   bool has_account(const member_id& id) const {
     auto index = accounts.template get_index<N(member)>();

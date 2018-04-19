@@ -136,14 +136,6 @@
         }
       ]
     }, {
-      "name": "calcrewards",
-      "base": "",
-      "fields": [{
-          "name": "pot",
-          "type": "asset"
-        }
-      ]
-    }, {
       "name": "bindmember",
       "base": "",
       "fields": [{
@@ -155,11 +147,11 @@
         }
       ]
     }, {
-      "name": "transfer",
+      "name": "unbindmember",
       "base": "",
       "fields": [{
-          "name": "pot",
-          "type": "asset"
+          "name": "member",
+          "type": "member_id"
         }
       ]
     }, {
@@ -187,14 +179,11 @@
       "name": "addvote",
       "type": "addvote"
     }, {
-      "name": "calcrewards",
-      "type": "calcrewards"
-    }, {
       "name": "bindmember",
       "type": "bindmember"
     }, {
-      "name": "transfer",
-      "type": "transfer"
+      "name": "unbindmember",
+      "type": "unbindmember"
     }, {
       "name": "reset",
       "type": "reset"

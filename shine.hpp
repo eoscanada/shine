@@ -1,10 +1,13 @@
-#include <eosio.system/eosio.system.hpp>
+#include <cmath>
+#include <string>
+
+#include <eosiolib/action.hpp>
+#include <eosiolib/asset.hpp>
 #include <eosiolib/eosio.hpp>
-#include <eosiolib/print.hpp>
+#include <eosiolib/fixed_key.hpp>
+
 
 // Configurable values
-#define CURRENCY_PRECISION 4
-
 #define GLOBAL_STAT_ID 0
 
 #define REWARD_PRAISE_POSTED_WEIGHT 0.07
@@ -14,17 +17,40 @@
 // Macro
 #define TABLE(X) ::eosio::string_to_name(#X)
 
-typedef checksum256 member_id;
-
-using eos_currency = eosiosystem::contract<N(eosio)>::currency;
+// Namespaces
 using eosio::asset;
 using eosio::const_mem_fun;
 using eosio::indexed_by;
 using eosio::key256;
+using eosio::permission_level;
 using std::string;
+
+// Typedefs
+typedef checksum256 member_id;
+
+namespace eosio {
+  /**
+   * The actual `eosio.token` transfer struct definition until its definition is accesible
+   * from an actual `eosio.token.hpp` file. Until then, we define it ourself so
+   * we can unpack the actual action data when a token transfer occurs inside
+   * the `eosio.token` contract to this contract's account.
+   */
+  struct token_transfer {
+    account_name from;
+    account_name to;
+    asset quantity;
+    string memo;
+  };
+}
+
+namespace dblk {
 
 class shine : public eosio::contract {
  public:
+  static bool is_token_transfer(uint64_t code, uint64_t action) {
+    return code == N(eosio.token) && action == N(transfer);
+  }
+
   shine(account_name contract_account)
       : eosio::contract(contract_account),
         accounts(contract_account, contract_account),
@@ -45,6 +71,12 @@ class shine : public eosio::contract {
 
   //@abi action
   void bindmember(const member_id& member, const account_name account);
+
+  //@abi action
+  void transfer(const asset& pot);
+
+  //@abi action
+  void reset(const uint64_t any);
 
   //@abi action
   void clear(const uint64_t any);
@@ -168,14 +200,6 @@ class shine : public eosio::contract {
 
   typedef eosio::multi_index<TABLE(rewards), reward> rewards_index;
 
-  static const asset_symbol EOS_SYMBOL;
-
-  inline static asset double_to_asset(double amount) {
-    return asset((uint64_t)(pow(10, CURRENCY_PRECISION) * amount), EOS_SYMBOL);
-  }
-
-  inline static double asset_to_double(const asset& asset) { return asset.amount / pow(10, CURRENCY_PRECISION); }
-
   static key256 compute_member_id_key(const member_id& member_id) {
     const uint64_t* p64 = reinterpret_cast<const uint64_t*>(&member_id);
     return key256::make_from_word_sequence<uint64_t>(p64[0], p64[1], p64[2], p64[3]);
@@ -191,7 +215,19 @@ class shine : public eosio::contract {
 
   double compute_vote_given_weighted_total() const;
 
+  bool has_account(const member_id& id) const {
+    auto index = accounts.template get_index<N(member)>();
+
+    return index.find(compute_member_id_key(id)) != index.end();
+  }
+
   bool has_praise(const uint64_t praise_id) const { return praises.find(praise_id) != praises.end(); }
+
+  bool has_rewards() const { return rewards.begin() != rewards.end(); }
+
+  void require_shine_active_auth() const {
+    require_auth(permission_level{_self, N(active)});
+  }
 
   void update_global_stat(const std::function<void(global_stat&)> updater);
 
@@ -206,3 +242,5 @@ class shine : public eosio::contract {
   global_stats_index global_stats;
   rewards_index rewards;
 };
+
+} // namespace dblk

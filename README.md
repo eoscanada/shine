@@ -198,6 +198,8 @@ Limitations:
 
 #### Set Contract Common Mistakes
 
+* Test when
+
 * ABI JSON Wrong Floating Type
 
   The correct way in the ABI JSON to represents a floating point

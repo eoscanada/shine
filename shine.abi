@@ -155,6 +155,22 @@
         }
       ]
     }, {
+      "name": "transfer",
+      "base": "",
+      "fields": [{
+          "name": "pot",
+          "type": "asset"
+        }
+      ]
+    }, {
+      "name": "reset",
+      "base": "",
+      "fields": [{
+          "name": "any",
+          "type": "uint64"
+        }
+      ]
+    }, {
       "name": "clear",
       "base": "",
       "fields": [{
@@ -176,6 +192,12 @@
     }, {
       "name": "bindmember",
       "type": "bindmember"
+    }, {
+      "name": "transfer",
+      "type": "transfer"
+    }, {
+      "name": "reset",
+      "type": "reset"
     }, {
       "name": "clear",
       "type": "clear"

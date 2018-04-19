@@ -38,6 +38,8 @@ def ask_action(prompt, context)
     menu.choice 'Vote', :vote
     menu.choice 'Rewards', :rewards
     menu.choice 'Bind Member', :bind_member
+    menu.choice 'Transfer', :transfer
+    menu.choice 'Reset', :reset
     menu.choice 'Clear', :clear
     menu.choice 'Scenario', :scenario
   end
@@ -165,6 +167,16 @@ def ask_reward_pot(prompt, context)
   end
 end
 
+def perform_transfer(prompt, context)
+  puts execute_transaction(context[:contract], 'transfer', JSON.generate({
+    pot: ask_reward_pot(prompt, context),
+  }))
+end
+
+def perform_reset(_prompt, context)
+  puts execute_transaction(context[:contract], 'reset', JSON.generate({ any: 0 }))
+end
+
 def perform_clear(_prompt, context)
   puts execute_transaction(context[:contract], 'clear', JSON.generate({ any: 0 }))
 end
@@ -194,11 +206,13 @@ def arguments_any?(arguments, *flags)
 end
 
 def extract_default_action(arguments)
-  return :praise if arguments_any?(arguments, '--praise', '-p')
-  return :vote if arguments_any?(arguments, '--vote', '-v')
-  return :rewards if arguments_any?(arguments, '--rewards', '-r')
-  return :bind_member if arguments_any?(arguments, '--member', '-m')
-  return :clear if arguments_any?(arguments, '--clear', '-c')
+  return :praise if arguments_any?(arguments, '--praise')
+  return :vote if arguments_any?(arguments, '--vote')
+  return :rewards if arguments_any?(arguments, '--rewards')
+  return :bind_member if arguments_any?(arguments, '--bind-member')
+  return :transfer if arguments_any?(arguments, '--transfer')
+  return :reset if arguments_any?(arguments, '--reset')
+  return :clear if arguments_any?(arguments, '--clear')
   return :scenario if arguments_any?(arguments, '--scenario')
 
   ENV['SHINE_BOT_ACTION'].nil? ? nil : ENV['SHINE_BOT_ACTION'].to_sym

@@ -1,27 +1,55 @@
 #include <algorithm>
 
+#include "asset.hpp"
 #include "shine.hpp"
 #include "table.hpp"
 
-const asset_symbol shine::EOS_SYMBOL = S(CURRENCY_PRECISION, EOS);
+// Namespaces
+using namespace dblk;
+
+using eosio::asset;
+using eosio::require_auth;
+using eosio::permission_level;
+using eosio::unpack_action_data;
 
 /**
- * Macro that auto-create the `apply` SmartContract C entrypoint
- * by matching the action received based on the list of action in the
- * macro definition. For each of defined action, a switch branch is added
+ * SmartContract C entrypoint using a macro based on the list of action in the.
+ * For each of defined action, a switch branch is added
  * automatically unpacking the data into the action's structure and dispatching
  * a method call to `action` define in this SmartContract.
  *
- * Each time a new action is added, this definition should be expanded with the
+ * Each time a new action is added, EOSIO_API definition should be expanded with the
  * new action handler's method name.
  */
-EOSIO_ABI(shine, (addpraise)(addvote)(calcrewards)(bindmember)(clear))
+extern "C" {
+  void apply(uint64_t receiver, uint64_t code, uint64_t action) {
+    auto self = receiver;
+    if (code == self) {
+      // Don't rename `thiscontract`, it's being use verbatim in `EOSIO_API` macro
+      shine thiscontract(self);
+      switch (action) {
+        EOSIO_API(shine, (addpraise)(addvote)(calcrewards)(bindmember)(transfer)(reset)(clear))
+      }
 
-using namespace dblk;
+      eosio_exit(0);
+    }
+
+    if (shine::is_token_transfer(code, action)) {
+      eosio::token_transfer action = unpack_action_data<eosio::token_transfer>();
+      if (action.to != self) {
+        eosio_exit(0);
+        return;
+      }
+
+      shine(self).transfer(action.quantity);
+      eosio_exit(0);
+    }
+  }
+}
 
 //@abi action
 void shine::addpraise(const member_id& author, const member_id& praisee, const string& memo) {
-  require_auth(_self);
+  require_shine_active_auth();
 
   auto praise_itr = praises.emplace(_self, [&](auto& praise) {
     praise.id = praises.available_primary_key();
@@ -37,7 +65,7 @@ void shine::addpraise(const member_id& author, const member_id& praisee, const s
 
 //@abi action
 void shine::addvote(const uint64_t praise_id, const member_id& voter) {
-  require_auth(_self);
+  require_shine_active_auth();
 
   auto praise_itr = praises.find(praise_id);
   eosio_assert(praise_itr != praises.end(), "praise with this id does not exist");
@@ -54,8 +82,20 @@ void shine::addvote(const uint64_t praise_id, const member_id& voter) {
   update_global_stat([](auto& global_stat) { global_stat.vote_explicit += 1; });
 }
 
+/**
+ * The calculation of rewards follow a simple algorithm using as raw input
+ * for each member:
+ *  + The amount of vote received
+ *  + The amount of vote given
+ *  + The amount of praise posted
+ *
+ * Base on these three values, a weight is computed for each of them:
+ *  + Vote received -> Proportional to total vote count (explicit + implicit)
+ *  + Vote given -> Proportional to total of vote given weight (1 vote -> 1/3, 2 votes -> 2/3, 2+ votes -> 3/3)
+ *  + Praise posted -> Propotional to total explicite vote count
+ */
 void shine::calcrewards(const asset& pot) {
-  require_auth(_self);
+  require_shine_active_auth();
 
   auto symbol = pot.symbol;
   eosio_assert(symbol.is_valid() && symbol == EOS_SYMBOL, "pot currency should be EOS with precision 4");
@@ -100,33 +140,92 @@ void shine::calcrewards(const asset& pot) {
   });
 }
 
+/**
+ * Associate an EOS account to a shine member. Assuming we receive in parameter
+ * `M` as member id and `A` as account, 5 possible cases can happen:
+ *  + A -> M' exists
+ *  + A' -> M exists
+ *  + A' -> M & A -> exist
+ *  + A -> M exists
+ *  + No mapping exist
+ *
+ * We also must keep the integrity so that we never encounter `A -> M & A' -> M`.
+ *
+ * Implementation wise, we must also note that the member index cannot change
+ * the `id` value of the table since it's the primary key, a removal + insertion
+ * must be peformed to change the primary key.
+ */
 void shine::bindmember(const member_id& member, const account_name account_id) {
-  require_auth(_self);
+  require_shine_active_auth();
 
   auto account_itr = accounts.find(account_id);
   if (account_itr != accounts.end()) {
+    if (account_itr->member == member) {
+      // Nothing to do, mapping is already the correct one.
+      return;
+    }
+
     accounts.erase(account_itr);
   }
 
   auto member_account_index = accounts.template get_index<N(member)>();
   auto member_itr = member_account_index.find(compute_member_id_key(member));
-  if (member_itr == member_account_index.end()) {
-    accounts.emplace(_self, [&](auto& account) {
-      account.id = account_id;
-      account.member = member;
-    });
-  } else {
-    member_account_index.modify(member_itr, _self, [&](auto& account) { account.id = account_id; });
+  if (member_itr != member_account_index.end()) {
+    member_account_index.erase(member_itr);
   }
+
+  accounts.emplace(_self, [&](auto& account) {
+    account.id = account_id;
+    account.member = member;
+  });
 }
 
-void shine::clear(const uint64_t any) {
-  table::clear(accounts);
+/**
+ * Transfer actual rewards to
+ */
+void shine::transfer(const asset& pot) {
+  require_shine_active_auth();
+
+  calcrewards(pot);
+  eosio_assert(has_rewards(), "cannot transfer pot without any rewards");
+
+  std::for_each(rewards.begin(), rewards.end(), [&](auto& reward) {
+    auto account_member_index = accounts.template get_index<N(member)>();
+    auto account_member_itr = account_member_index.find(compute_member_id_key(reward.member));
+    if (account_member_itr == account_member_index.end()) {
+      eosio::print("No mapping from member to account name, no reward to transfer.");
+      return;
+    }
+
+    eosio::token_transfer transfer{_self, account_member_itr->id, reward.amount_total, ""};
+    eosio::action(permission_level{_self, N(active)}, N(eosio.token), N(transfer), transfer).send();
+  });
+}
+
+/**
+ * Reset statistics for praises, votes, stats and rewards. Mapping between
+ * member and account will be kept.
+ */
+void shine::reset(const uint64_t any) {
+  require_shine_active_auth();
+
   table::clear(praises);
   table::clear(votes);
   table::clear(stats);
   table::clear(global_stats);
   table::clear(rewards);
+}
+
+/**
+ * Clear all tables of this contract to start from scratch.
+ *
+ * **Important** Only useful in development, should not be used in production.
+ */
+void shine::clear(const uint64_t any) {
+  require_shine_active_auth();
+
+  table::clear(accounts);
+  reset(any);
 }
 
 double shine::compute_vote_given_weighted_total() const {

@@ -61,7 +61,6 @@ class shine : public eosio::contract {
         rewards(contract_account, contract_account) {}
 
   // Actions
-
   void addpraise(const member_id& author, const member_id& praisee, const string& memo);
   void addvote(const uint64_t praise_id, const member_id& voter);
   void bindmember(const member_id& member, const account_name account);
@@ -203,8 +202,6 @@ class shine : public eosio::contract {
 
     return 1.0;
   }
-
-  double compute_vote_given_weighted_total() const;
 
   void compute_rewards(const asset& pot);
 

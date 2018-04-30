@@ -36,12 +36,12 @@ extern "C" {
 
     if (shine::is_token_transfer(code, action)) {
       eosio::token_transfer action = unpack_action_data<eosio::token_transfer>();
-      if (action.to != self) {
-        eosio_exit(0);
-        return;
+
+      // Only pass notification to shine if transfer `to` is shine contract account and `quantity` are EOS tokens
+      if (action.to == self && action.quantity.symbol == EOS_SYMBOL) {
+        shine(self).transfer(action.quantity);
       }
 
-      shine(self).transfer(action.quantity);
       eosio_exit(0);
     }
   }
@@ -52,7 +52,7 @@ extern "C" {
 ///
 
 void shine::addpraise(const member_id& author, const member_id& praisee, const string& memo) {
-  // require_shine_active_auth();
+  require_shine_active_auth();
 
   auto praise_itr = praises.emplace(_self, [&](auto& praise) {
     praise.id = praises.available_primary_key();
@@ -198,25 +198,32 @@ void shine::transfer(const asset& pot) {
  * Base on these three values, a weight is computed for each of them:
  *  + Vote received -> Proportional to total vote count (explicit + implicit)
  *  + Vote given -> Proportional to total of vote given weight (1 vote -> 1/3, 2 votes -> 2/3, 2+ votes -> 3/3)
- *  + Praise posted -> Propotional to total explicite vote count
+ *  + Praise posted -> Propotional to total explicite vote count.
+ *
+ * The algorithm loops twice on all the stats giving 2N iterations.
  */
 void shine::compute_rewards(const asset& pot) {
-  auto symbol = pot.symbol;
-  eosio_assert(symbol.is_valid() && symbol == EOS_SYMBOL, "pot currency should be EOS with precision 4");
-
-  auto global_stats_itr = global_stats.find(GLOBAL_STAT_ID);
-  eosio_assert(global_stats_itr != global_stats.end(), "cannot compute rewards without any praise");
+  // auto global_stats_itr = global_stats.find(GLOBAL_STAT_ID);
+  // eosio_assert(global_stats_itr != global_stats.end(), "cannot compute rewards without any praise");
 
   auto pot_amount = asset_to_double(pot);
-  auto vote_implicit = global_stats_itr->vote_implicit;
-  auto vote_explicit = global_stats_itr->vote_explicit;
-  auto vote_total = vote_implicit + vote_explicit;
 
-  // This loop through all stats giving 2N iterations. Ideally, this could
-  // probably eliminated somehow. At least, computation of
-  // `compute_vote_given_weight` could be cached so it would not be redo in the
-  // second loop that follows.
-  auto vote_given_weighted_total = compute_vote_given_weighted_total();
+  uint64_t vote_implicit = 0;
+  uint64_t vote_explicit = 0;
+  uint64_t vote_total = 0;
+  double vote_given_weighted_total = 0.0;
+
+  std::for_each(stats.begin(), stats.end(), [&](auto& stats) {
+    // if (!has_account(member)) return;
+
+    auto praised_posted = stats.praise_posted;
+    auto vote_given = stats.vote_given_explicit;
+
+    vote_implicit += praised_posted;
+    vote_explicit += vote_given;
+    vote_total += praised_posted + vote_given;
+    vote_given_weighted_total += vote_given * compute_vote_given_weight(vote_given);
+  });
 
   std::for_each(stats.begin(), stats.end(), [&](auto& stats) {
     auto vote_received = stats.vote_received_explicit + stats.vote_received_implicit;
@@ -247,18 +254,6 @@ void shine::compute_rewards(const asset& pot) {
 ///
 //// Helpers
 ///
-
-double shine::compute_vote_given_weighted_total() const {
-  auto vote_given_weighted_total = 0.0;
-
-  std::for_each(stats.begin(), stats.end(), [&](auto& stats) {
-    auto vote_given = stats.vote_given_explicit;
-
-    vote_given_weighted_total += vote_given * compute_vote_given_weight(vote_given);
-  });
-
-  return vote_given_weighted_total;
-}
 
 void shine::update_global_stat(const std::function<void(global_stat&)> updater) {
   auto global_stat_itr = global_stats.find(GLOBAL_STAT_ID);

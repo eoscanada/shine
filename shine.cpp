@@ -8,8 +8,8 @@
 using namespace dblk;
 
 using eosio::asset;
-using eosio::require_auth;
 using eosio::permission_level;
+using eosio::require_auth;
 using eosio::unpack_action_data;
 
 /**
@@ -22,40 +22,39 @@ using eosio::unpack_action_data;
  * new action handler's method name.
  */
 extern "C" {
-  void apply(uint64_t receiver, uint64_t code, uint64_t action) {
-    auto self = receiver;
-    if (code == self) {
-      // Don't rename `thiscontract`, it's being use verbatim in `EOSIO_API` macro
-      shine thiscontract(self);
-      switch (action) {
-        EOSIO_API(shine, (addpraise)(addvote)(bindmember)(unbindmember)(reset)(clear))
-      }
+void apply(uint64_t receiver, uint64_t code, uint64_t action) {
+  auto self = receiver;
+  if (code == self) {
+    // Don't rename `thiscontract`, it's being use verbatim in `EOSIO_API` macro
+    shine thiscontract(self);
+    switch (action) { EOSIO_API(shine, (addpraise)(addvote)(bindmember)(unbindmember)(reset)(clear)) }
 
-      eosio_exit(0);
-    }
-
-    if (shine::is_token_transfer(code, action)) {
-      eosio::token_transfer action = unpack_action_data<eosio::token_transfer>();
-      if (action.to != self) {
-        eosio_exit(0);
-        return;
-      }
-
-      shine(self).transfer(action.quantity);
-      eosio_exit(0);
-    }
+    eosio_exit(0);
   }
+
+  if (shine::is_token_transfer(code, action)) {
+    eosio::token_transfer action = unpack_action_data<eosio::token_transfer>();
+
+    // Only pass notification to shine if transfer `to` is shine contract account and `quantity` are EOS tokens
+    if (action.to == self && action.quantity.symbol == EOS_SYMBOL) {
+      shine(self).transfer(action.quantity);
+    }
+
+    eosio_exit(0);
+  }
+}
 }
 
 ///
 //// Actions
 ///
 
-void shine::addpraise(const member_id& author, const member_id& praisee, const string& memo) {
-  // require_shine_active_auth();
+void shine::addpraise(const post_id& post, const member_id& author, const member_id& praisee, const string& memo) {
+  require_shine_active_auth();
 
   auto praise_itr = praises.emplace(_self, [&](auto& praise) {
     praise.id = praises.available_primary_key();
+    praise.post = post;
     praise.author = author;
     praise.praisee = praisee;
     praise.memo = memo;
@@ -66,15 +65,16 @@ void shine::addpraise(const member_id& author, const member_id& praisee, const s
   update_global_stat([](auto& global_stat) { global_stat.vote_implicit += 1; });
 }
 
-void shine::addvote(const uint64_t praise_id, const member_id& voter) {
+void shine::addvote(const post_id& post, const member_id& voter) {
   require_shine_active_auth();
 
-  auto praise_itr = praises.find(praise_id);
-  eosio_assert(praise_itr != praises.end(), "praise with this id does not exist");
+  auto post_index = praises.template get_index<N(post)>();
+  auto praise_itr = post_index.find(compute_member_id_key(post));
+  eosio_assert(praise_itr != post_index.end(), "praise with this id does not exist");
 
   votes.emplace(_self, [&](auto& vote) {
     vote.id = votes.available_primary_key();
-    vote.praise_id = praise_id;
+    vote.post = praise_itr->post;
     vote.voter = voter;
   });
 
@@ -198,25 +198,32 @@ void shine::transfer(const asset& pot) {
  * Base on these three values, a weight is computed for each of them:
  *  + Vote received -> Proportional to total vote count (explicit + implicit)
  *  + Vote given -> Proportional to total of vote given weight (1 vote -> 1/3, 2 votes -> 2/3, 2+ votes -> 3/3)
- *  + Praise posted -> Propotional to total explicite vote count
+ *  + Praise posted -> Propotional to total explicite vote count.
+ *
+ * The algorithm loops twice on all the stats giving 2N iterations.
  */
 void shine::compute_rewards(const asset& pot) {
-  auto symbol = pot.symbol;
-  eosio_assert(symbol.is_valid() && symbol == EOS_SYMBOL, "pot currency should be EOS with precision 4");
-
-  auto global_stats_itr = global_stats.find(GLOBAL_STAT_ID);
-  eosio_assert(global_stats_itr != global_stats.end(), "cannot compute rewards without any praise");
+  // auto global_stats_itr = global_stats.find(GLOBAL_STAT_ID);
+  // eosio_assert(global_stats_itr != global_stats.end(), "cannot compute rewards without any praise");
 
   auto pot_amount = asset_to_double(pot);
-  auto vote_implicit = global_stats_itr->vote_implicit;
-  auto vote_explicit = global_stats_itr->vote_explicit;
-  auto vote_total = vote_implicit + vote_explicit;
 
-  // This loop through all stats giving 2N iterations. Ideally, this could
-  // probably eliminated somehow. At least, computation of
-  // `compute_vote_given_weight` could be cached so it would not be redo in the
-  // second loop that follows.
-  auto vote_given_weighted_total = compute_vote_given_weighted_total();
+  uint64_t vote_implicit = 0;
+  uint64_t vote_explicit = 0;
+  uint64_t vote_total = 0;
+  double vote_given_weighted_total = 0.0;
+
+  std::for_each(stats.begin(), stats.end(), [&](auto& stats) {
+    // if (!has_account(member)) return;
+
+    auto praised_posted = stats.praise_posted;
+    auto vote_given = stats.vote_given_explicit;
+
+    vote_implicit += praised_posted;
+    vote_explicit += vote_given;
+    vote_total += praised_posted + vote_given;
+    vote_given_weighted_total += vote_given * compute_vote_given_weight(vote_given);
+  });
 
   std::for_each(stats.begin(), stats.end(), [&](auto& stats) {
     auto vote_received = stats.vote_received_explicit + stats.vote_received_implicit;
@@ -247,18 +254,6 @@ void shine::compute_rewards(const asset& pot) {
 ///
 //// Helpers
 ///
-
-double shine::compute_vote_given_weighted_total() const {
-  auto vote_given_weighted_total = 0.0;
-
-  std::for_each(stats.begin(), stats.end(), [&](auto& stats) {
-    auto vote_given = stats.vote_given_explicit;
-
-    vote_given_weighted_total += vote_given * compute_vote_given_weight(vote_given);
-  });
-
-  return vote_given_weighted_total;
-}
 
 void shine::update_global_stat(const std::function<void(global_stat&)> updater) {
   auto global_stat_itr = global_stats.find(GLOBAL_STAT_ID);

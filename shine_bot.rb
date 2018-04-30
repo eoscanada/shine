@@ -48,30 +48,31 @@ def perform_scenario(_prompt, context)
   contract = context[:contract]
 
   praises = [
-    { author: 'matt', praisee: 'eve' },
-    { author: 'matt', praisee: 'eve' },
-    { author: 'evan', praisee: 'eve' },
-    { author: 'eve', praisee: 'matt' },
-    { author: 'mike', praisee: 'matt' },
-    { author: 'mike', praisee: 'eve' },
-    { author: 'mike', praisee: 'evan' },
+    { post: "0", author: 'matt', praisee: 'eve' },
+    { post: "1", author: 'matt', praisee: 'eve' },
+    { post: "2", author: 'evan', praisee: 'eve' },
+    { post: "3", author: 'eve', praisee: 'matt' },
+    { post: "4", author: 'mike', praisee: 'matt' },
+    { post: "5", author: 'mike', praisee: 'eve' },
+    { post: "6", author: 'mike', praisee: 'evan' },
   ]
 
   votes = [
-    { voter: 'evan', praise_id: 0 },
-    { voter: 'evan', praise_id: 1 },
-    { voter: 'mike', praise_id: 1 },
-    { voter: 'mike', praise_id: 3 },
-    { voter: 'mike', praise_id: 3 },
-    { voter: 'evan', praise_id: 3 },
-    { voter: 'eve', praise_id: 4 },
-    { voter: 'matt', praise_id: 5 },
-    { voter: 'matt', praise_id: 6 },
-    { voter: 'eve', praise_id: 6 },
+    { voter: 'evan', post: '0' },
+    { voter: 'evan', post: '1' },
+    { voter: 'mike', post: '1' },
+    { voter: 'mike', post: '3' },
+    { voter: 'mike', post: '3' },
+    { voter: 'evan', post: '3' },
+    { voter: 'eve', post: '4' },
+    { voter: 'matt', post: '5' },
+    { voter: 'matt', post: '6' },
+    { voter: 'eve', post: '6' },
   ]
 
   praises.each do |praise|
     execute_praise(contract, {
+      post: sha256(praise[:post]),
       author: sha256(praise[:author]),
       praisee: sha256(praise[:praisee]),
       memo: "#{praise[:author]} -> #{praise[:praisee]}",
@@ -80,7 +81,7 @@ def perform_scenario(_prompt, context)
 
   votes.each do |vote|
     execute_vote(contract, {
-      praise_id: vote[:praise_id],
+      post: sha256(vote[:post]),
       voter: sha256(vote[:voter]),
     })
   end
@@ -88,6 +89,7 @@ end
 
 def perform_praise(prompt, context)
   praise = {
+    post: ask_post(prompt, context, 'Post:', ENV['SHINE_BOT_POST']),
     author: ask_member_id(prompt, context, 'Author:', ENV['SHINE_BOT_AUTHOR']),
     praisee: ask_member_id(prompt, context, 'Praisee:', ENV['SHINE_BOT_PRAISEE']),
     memo: ask_memo(prompt, context),
@@ -116,8 +118,8 @@ end
 
 def perform_vote(prompt, context)
   vote = {
-    praise_id: ask_praise_id(prompt, context),
-    voter: ask_member_id(prompt, context, 'Voter:', ENV['SHINE_BOT_VOTER']),
+    post: ask_post(prompt, context, 'Post: ', ENV['SHINE_BOT_POST']),
+    voter: ask_member_id(prompt, context, 'Voter: ', ENV['SHINE_BOT_VOTER']),
   }
 
   puts 'Data:'
@@ -170,6 +172,16 @@ def ask_account(prompt, context, text, default = nil)
     question.required true
     question.default default
     question.validate EOS_NAME_REGEX
+  end
+end
+
+def ask_post(prompt, context, text, default)
+  return sha256(default) if default && context[:quick_run]
+
+  prompt.ask(text) do |question|
+    question.required true
+    question.default default
+    question.convert -> (input) { sha256(input) }
   end
 end
 

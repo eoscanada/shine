@@ -2,6 +2,9 @@
   "types": [{
     "new_type_name": "member_id",
     "type": "checksum256"
+  }, {
+    "new_type_name": "post_id",
+    "type": "checksum256"
   }],
   "structs": [{
       "name": "account",
@@ -21,6 +24,9 @@
           "name": "id",
           "type": "uint64"
         }, {
+          "name": "post",
+          "type": "post_id"
+        }, {
           "name": "author",
           "type": "member_id"
         }, {
@@ -38,8 +44,8 @@
           "name": "id",
           "type": "uint64"
         }, {
-          "name": "praise_id",
-          "type": "uint64"
+          "name": "post",
+          "type": "post_id"
         }, {
           "name": "voter",
           "type": "member_id"
@@ -114,6 +120,9 @@
       "name": "addpraise",
       "base": "",
       "fields": [{
+          "name": "post",
+          "type": "post_id"
+        }, {
           "name": "author",
           "type": "member_id"
         }, {
@@ -128,8 +137,8 @@
       "name": "addvote",
       "base": "",
       "fields": [{
-          "name": "praise_id",
-          "type": "uint64"
+          "name": "post",
+          "type": "post_id"
         }, {
           "name": "voter",
           "type": "member_id"
@@ -170,7 +179,7 @@
           "type": "uint64"
         }
       ]
-    },
+    }
   ],
   "actions": [{
       "name": "addpraise",

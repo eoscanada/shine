@@ -20,7 +20,7 @@ def main(arguments)
 end
 
 def ask_contract(prompt)
-  default = ENV['SHINE_BOT_CONTRACT']
+  default = ENV['CONTRACT_ACCOUNT']
   return default if default
 
   prompt.ask('Contract:') do |question|
@@ -225,8 +225,10 @@ def execute_transaction(contract, action, data)
 end
 
 def execute_cleos(arguments)
-  wallet_host = ENV['SHINE_BOT_WALLET_HOST']
-  wallet_port = ENV['SHINE_BOT_WALLET_PORT']
+  blockchain_host = ENV['BLOCKCHAIN_HOST']
+  blockchain_port = ENV['BLOCKCHAIN_PORT']
+  wallet_host = ENV['WALLET_HOST']
+  wallet_port = ENV['WALLET_PORT']
 
   options = []
   options << '--wallet-port' << wallet_port if wallet_port

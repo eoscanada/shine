@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -6,8 +7,8 @@
 #include <eosiolib/eosio.hpp>
 #include <eosiolib/fixed_key.hpp>
 
-// Constants
-#define GLOBAL_STAT_ID 0
+#include "asset.hpp"
+#include "table.hpp"
 
 // Configurable values
 #define REWARD_PRAISE_POSTED_WEIGHT 0.07
@@ -23,7 +24,13 @@ using eosio::const_mem_fun;
 using eosio::indexed_by;
 using eosio::key256;
 using eosio::permission_level;
+using eosio::require_auth;
+using eosio::unpack_action_data;
+using std::for_each;
+using std::function;
 using std::string;
+
+using namespace eoscanada;
 
 // Typedefs
 typedef checksum256 member_id;
@@ -31,6 +38,7 @@ typedef checksum256 post_id;
 
 namespace eosio {
 /**
+ * FIXME:
  * The actual `eosio.token` transfer struct definition until its definition is accesible
  * from an actual `eosio.token.hpp` file. Until then, we define it ourself so
  * we can unpack the actual action data when a token transfer occurs inside
@@ -44,7 +52,7 @@ struct token_transfer {
 };
 }  // namespace eosio
 
-namespace dblk {
+namespace eoscanada {
 
 class shine : public eosio::contract {
  public:
@@ -58,7 +66,6 @@ class shine : public eosio::contract {
         praises(contract_account, contract_account),
         votes(contract_account, contract_account),
         stats(contract_account, contract_account),
-        global_stats(contract_account, contract_account),
         rewards(contract_account, contract_account) {}
 
   // Actions
@@ -79,7 +86,7 @@ class shine : public eosio::contract {
     member_id member;
 
     uint64_t primary_key() const { return id; }
-    key256 by_member() const { return shine::compute_member_id_key(member); }
+    key256 by_member() const { return shine::compute_checksum256_key(member); }
 
     void print() const { eosio::print("Account (", eosio::name{id}, ")"); }
 
@@ -99,7 +106,7 @@ class shine : public eosio::contract {
     string memo;
 
     uint64_t primary_key() const { return id; }
-    key256 by_post() const { return shine::compute_member_id_key(post); }
+    key256 by_post() const { return shine::compute_checksum256_key(post); }
 
     void print() const { eosio::print("Praise (", eosio::name{id}, ")"); }
 
@@ -150,7 +157,7 @@ class shine : public eosio::contract {
           vote_received_explicit(0) {}
 
     uint64_t primary_key() const { return id; }
-    key256 by_member() const { return shine::compute_member_id_key(member); }
+    key256 by_member() const { return shine::compute_checksum256_key(member); }
 
     void print() const { eosio::print("Member stat (", eosio::name{id}, ")"); }
 
@@ -162,21 +169,6 @@ class shine : public eosio::contract {
                              indexed_by<N(member), const_mem_fun<member_stat, key256, &member_stat::by_member>>>
       member_stats_index;
 
-  //@abi table global_stats i64
-  struct global_stat {
-    uint64_t id;
-    uint64_t vote_implicit;
-    uint64_t vote_explicit;
-
-    uint64_t primary_key() const { return id; }
-
-    void print() const { eosio::print("Global Stat (", eosio::name{id}, ")"); }
-
-    EOSLIB_SERIALIZE(global_stat, (id)(vote_implicit)(vote_explicit))
-  };
-
-  typedef eosio::multi_index<TABLE(globalstats), global_stat> global_stats_index;
-
   //@abi table rewards i64
   struct reward {
     uint64_t id;
@@ -184,19 +176,45 @@ class shine : public eosio::contract {
     asset amount_praise_posted;
     asset amount_vote_received;
     asset amount_vote_given;
+    asset amount_extra;
     asset amount_total;
 
     uint64_t primary_key() const { return id; }
+    key256 by_member() const { return shine::compute_checksum256_key(member); }
 
     void print() const { eosio::print("Reward (", eosio::name{id}, ")"); }
 
-    EOSLIB_SERIALIZE(reward, (id)(member)(amount_praise_posted)(amount_vote_received)(amount_vote_given)(amount_total))
+    EOSLIB_SERIALIZE(
+        reward, (id)(member)(amount_praise_posted)(amount_vote_received)(amount_vote_given)(amount_extra)(amount_total))
   };
 
-  typedef eosio::multi_index<TABLE(rewards), reward> rewards_index;
+  typedef eosio::multi_index<TABLE(rewards), reward,
+                             indexed_by<N(member), const_mem_fun<reward, key256, &reward::by_member>>>
+      rewards_index;
 
-  static key256 compute_member_id_key(const member_id& member_id) {
-    const uint64_t* p64 = reinterpret_cast<const uint64_t*>(&member_id);
+  struct distribution_stat {
+    uint64_t member_count;
+    uint64_t distributed_count;
+
+    uint64_t vote_explicit;
+    uint64_t vote_total;
+    double vote_given_weighted_total;
+
+    asset distributed_pot;
+    asset undistributed_pot;
+
+    distribution_stat()
+        : member_count(0),
+          distributed_count(0),
+          vote_explicit(0),
+          vote_total(0),
+          vote_given_weighted_total(0),
+          distributed_pot(0, EOS_SYMBOL),
+          undistributed_pot(0, EOS_SYMBOL) {}
+  };
+
+  static key256 compute_checksum256_key(const checksum256& checksum) {
+    const uint64_t* p64 = reinterpret_cast<const uint64_t*>(&checksum);
     return key256::make_from_word_sequence<uint64_t>(p64[0], p64[1], p64[2], p64[3]);
   }
 
@@ -209,29 +227,35 @@ class shine : public eosio::contract {
   }
 
   void compute_rewards(const asset& pot);
+  void compute_global_stats(distribution_stat& distribution);
+  void distribute_rewards_to_bound_members(const asset& pot, distribution_stat& distribution);
+  void distribute_pot_balance_to_first_member(const asset& balance, distribution_stat& distribution);
+  void distribute_pot_balance_to_bound_members(asset balance, distribution_stat& distribution);
+
+  member_stats_index::const_iterator find_last_stats_member_itr() {
+    for (auto itr = stats.end(); itr != stats.begin(); itr = itr--) {
+      if (has_account(itr->member)) return itr;
+    }
+
+    return stats.end();
+  }
 
   bool has_account(const member_id& id) const {
     auto index = accounts.template get_index<N(member)>();
 
-    return index.find(compute_member_id_key(id)) != index.end();
+    return index.find(compute_checksum256_key(id)) != index.end();
   }
 
   bool has_rewards() const { return rewards.begin() != rewards.end(); }
-
   void require_shine_active_auth() const { require_auth(permission_level{_self, N(active)}); }
-
-  void update_global_stat(const std::function<void(global_stat&)> updater);
-
-  void update_member_stat(const member_id& member, const std::function<void(member_stat&)> updater);
-
-  void update_reward_for_member(const uint64_t id, const member_id& member, const std::function<void(reward&)> updater);
+  void update_member_stat(const member_id& member, const function<void(member_stat&)> updater);
+  void update_reward_for_member(const member_id& member, const function<void(reward&)> updater);
 
   accounts_index accounts;
   praises_index praises;
   votes_index votes;
   member_stats_index stats;
-  global_stats_index global_stats;
   rewards_index rewards;
 };
 
-}  // namespace dblk
+}  // namespace eoscanada

@@ -4,7 +4,7 @@
 
 #include <eosiolib/eosio.hpp>
 
-namespace dblk {
+namespace eoscanada {
 namespace table {
 
 /**
@@ -19,4 +19,4 @@ void clear(eosio::multi_index<TableName, T, Indices...>& table) {
 }
 
 }  // namespace table
-}  // namespace dblk
+}  // namespace eoscanada

@@ -27,21 +27,22 @@ using std::string;
 
 // Typedefs
 typedef checksum256 member_id;
+typedef checksum256 post_id;
 
 namespace eosio {
-  /**
-   * The actual `eosio.token` transfer struct definition until its definition is accesible
-   * from an actual `eosio.token.hpp` file. Until then, we define it ourself so
-   * we can unpack the actual action data when a token transfer occurs inside
-   * the `eosio.token` contract to this contract's account.
-   */
-  struct token_transfer {
-    account_name from;
-    account_name to;
-    asset quantity;
-    string memo;
-  };
-}
+/**
+ * The actual `eosio.token` transfer struct definition until its definition is accesible
+ * from an actual `eosio.token.hpp` file. Until then, we define it ourself so
+ * we can unpack the actual action data when a token transfer occurs inside
+ * the `eosio.token` contract to this contract's account.
+ */
+struct token_transfer {
+  account_name from;
+  account_name to;
+  asset quantity;
+  string memo;
+};
+}  // namespace eosio
 
 namespace dblk {
 
@@ -61,8 +62,8 @@ class shine : public eosio::contract {
         rewards(contract_account, contract_account) {}
 
   // Actions
-  void addpraise(const member_id& author, const member_id& praisee, const string& memo);
-  void addvote(const uint64_t praise_id, const member_id& voter);
+  void addpraise(const post_id& post, const member_id& author, const member_id& praisee, const string& memo);
+  void addvote(const post_id& post, const member_id& voter);
   void bindmember(const member_id& member, const account_name account);
   void unbindmember(const member_id& member);
   void reset(const uint64_t any);
@@ -72,7 +73,7 @@ class shine : public eosio::contract {
   void transfer(const asset& pot);
 
  private:
-   //@abi table accounts i64
+  //@abi table accounts i64
   struct account {
     account_name id;
     member_id member;
@@ -92,30 +93,34 @@ class shine : public eosio::contract {
   //@abi table praises i64
   struct praise {
     uint64_t id;
+    post_id post;
     member_id author;
     member_id praisee;
     string memo;
 
     uint64_t primary_key() const { return id; }
+    key256 by_post() const { return shine::compute_member_id_key(post); }
 
     void print() const { eosio::print("Praise (", eosio::name{id}, ")"); }
 
-    EOSLIB_SERIALIZE(praise, (id)(author)(praisee)(memo))
+    EOSLIB_SERIALIZE(praise, (id)(post)(author)(praisee)(memo))
   };
 
-  typedef eosio::multi_index<TABLE(praises), praise> praises_index;
+  typedef eosio::multi_index<TABLE(praises), praise,
+                             indexed_by<N(post), const_mem_fun<praise, key256, &praise::by_post>>>
+      praises_index;
 
   //@abi table votes i64
   struct vote {
     uint64_t id;
-    uint64_t praise_id;
+    post_id post;
     member_id voter;
 
     uint64_t primary_key() const { return id; }
 
     void print() const { eosio::print("Vote (", eosio::name{id}, ")"); }
 
-    EOSLIB_SERIALIZE(vote, (id)(praise_id)(voter))
+    EOSLIB_SERIALIZE(vote, (id)(post)(voter))
   };
 
   typedef eosio::multi_index<TABLE(votes), vote> votes_index;
@@ -211,13 +216,9 @@ class shine : public eosio::contract {
     return index.find(compute_member_id_key(id)) != index.end();
   }
 
-  bool has_praise(const uint64_t praise_id) const { return praises.find(praise_id) != praises.end(); }
-
   bool has_rewards() const { return rewards.begin() != rewards.end(); }
 
-  void require_shine_active_auth() const {
-    require_auth(permission_level{_self, N(active)});
-  }
+  void require_shine_active_auth() const { require_auth(permission_level{_self, N(active)}); }
 
   void update_global_stat(const std::function<void(global_stat&)> updater);
 
@@ -233,4 +234,4 @@ class shine : public eosio::contract {
   rewards_index rewards;
 };
 
-} // namespace dblk
+}  // namespace dblk

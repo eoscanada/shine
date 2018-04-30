@@ -8,8 +8,8 @@
 using namespace dblk;
 
 using eosio::asset;
-using eosio::require_auth;
 using eosio::permission_level;
+using eosio::require_auth;
 using eosio::unpack_action_data;
 
 /**
@@ -22,40 +22,39 @@ using eosio::unpack_action_data;
  * new action handler's method name.
  */
 extern "C" {
-  void apply(uint64_t receiver, uint64_t code, uint64_t action) {
-    auto self = receiver;
-    if (code == self) {
-      // Don't rename `thiscontract`, it's being use verbatim in `EOSIO_API` macro
-      shine thiscontract(self);
-      switch (action) {
-        EOSIO_API(shine, (addpraise)(addvote)(bindmember)(unbindmember)(reset)(clear))
-      }
+void apply(uint64_t receiver, uint64_t code, uint64_t action) {
+  auto self = receiver;
+  if (code == self) {
+    // Don't rename `thiscontract`, it's being use verbatim in `EOSIO_API` macro
+    shine thiscontract(self);
+    switch (action) { EOSIO_API(shine, (addpraise)(addvote)(bindmember)(unbindmember)(reset)(clear)) }
 
-      eosio_exit(0);
-    }
-
-    if (shine::is_token_transfer(code, action)) {
-      eosio::token_transfer action = unpack_action_data<eosio::token_transfer>();
-
-      // Only pass notification to shine if transfer `to` is shine contract account and `quantity` are EOS tokens
-      if (action.to == self && action.quantity.symbol == EOS_SYMBOL) {
-        shine(self).transfer(action.quantity);
-      }
-
-      eosio_exit(0);
-    }
+    eosio_exit(0);
   }
+
+  if (shine::is_token_transfer(code, action)) {
+    eosio::token_transfer action = unpack_action_data<eosio::token_transfer>();
+
+    // Only pass notification to shine if transfer `to` is shine contract account and `quantity` are EOS tokens
+    if (action.to == self && action.quantity.symbol == EOS_SYMBOL) {
+      shine(self).transfer(action.quantity);
+    }
+
+    eosio_exit(0);
+  }
+}
 }
 
 ///
 //// Actions
 ///
 
-void shine::addpraise(const member_id& author, const member_id& praisee, const string& memo) {
+void shine::addpraise(const post_id& post, const member_id& author, const member_id& praisee, const string& memo) {
   require_shine_active_auth();
 
   auto praise_itr = praises.emplace(_self, [&](auto& praise) {
     praise.id = praises.available_primary_key();
+    praise.post = post;
     praise.author = author;
     praise.praisee = praisee;
     praise.memo = memo;
@@ -66,15 +65,16 @@ void shine::addpraise(const member_id& author, const member_id& praisee, const s
   update_global_stat([](auto& global_stat) { global_stat.vote_implicit += 1; });
 }
 
-void shine::addvote(const uint64_t praise_id, const member_id& voter) {
+void shine::addvote(const post_id& post, const member_id& voter) {
   require_shine_active_auth();
 
-  auto praise_itr = praises.find(praise_id);
-  eosio_assert(praise_itr != praises.end(), "praise with this id does not exist");
+  auto post_index = praises.template get_index<N(post)>();
+  auto praise_itr = post_index.find(compute_member_id_key(post));
+  eosio_assert(praise_itr != post_index.end(), "praise with this id does not exist");
 
   votes.emplace(_self, [&](auto& vote) {
     vote.id = votes.available_primary_key();
-    vote.praise_id = praise_id;
+    vote.post = praise_itr->post;
     vote.voter = voter;
   });
 

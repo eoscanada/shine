@@ -16,10 +16,11 @@ import (
 	"github.com/eoscanada/eos-go/ecc"
 )
 
-var accountNameString = flag.String("account-name", "shine3", "Account name where to set shine code")
+var accountNameString = flag.String("account-name", "shine", "Account name where to set shine code")
 var shineCodePath = flag.String("shine-code-path", "./", "Path to shine abi and wasm file")
 var apiAddr = flag.String("api-addr", "http://localhost:8888", "RPC endpoint of the nodeos instance")
 var privateKey = flag.String("private-key", "", "Private key")
+var accountPublicKey = flag.String("shine-account-public-key", "", "Shine account public key")
 
 func main() {
 
@@ -40,16 +41,6 @@ func main() {
 
 	api.SetSigner(keyBag)
 
-	setCodeTx, err := system.NewSetCodeTx(
-		eos.AccountName(*accountNameString),
-		path.Join(*shineCodePath, "shine.wasm"),
-		path.Join(*shineCodePath, "shine.abi"),
-	)
-	if err != nil {
-		log.Fatal("setcode creation error: ", err)
-	}
-
-
 	accountName := eos.AccountName(*accountNameString)
 	accountResp, err := api.GetAccount(accountName)
 	if err != nil {
@@ -58,11 +49,20 @@ func main() {
 	if len(accountResp.Permissions) == 0 {
 
 		_, err = api.SignPushActions(
-			system.NewNewAccount(eos.AccountName("eosio"), accountName, ecc.MustNewPublicKey("EOS66MfGpiepzs46DudrpSQw6GEn2QywFYVMWc18hBFVVVehdbKdi")),
+			system.NewNewAccount(eos.AccountName("eosio"), accountName, ecc.MustNewPublicKey(*accountPublicKey)),
 		)
 		if err != nil {
 			log.Fatal(err)
 		}
+	}
+
+	setCodeTx, err := system.NewSetCodeTx(
+		eos.AccountName(*accountNameString),
+		path.Join(*shineCodePath, "shine.wasm"),
+		path.Join(*shineCodePath, "shine.abi"),
+	)
+	if err != nil {
+		log.Fatal("setcode creation error: ", err)
 	}
 
 	resp, err := api.SignPushTransaction(setCodeTx, &eos.TxOptions{})

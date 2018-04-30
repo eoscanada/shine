@@ -30,12 +30,12 @@ func hash(s string) eos.SHA256Bytes {
 
 }
 
-func (s *Shine) HandleCommand(fromUser, command string, msgID string, params ...string) error {
+func (s *Shine) HandleCommand(fromUser, post string, command string,  params ...string) error {
 	var action *eos.Action
 
 	switch command {
 	case "recognize":
-		action = newAddPraise(s.accountName, hash(fromUser), hash(params[0]), params[1], hash(msgID))
+		action = newAddPraise(s.accountName, hash(post), hash(fromUser), hash(params[0]), params[1])
 	default:
 		return fmt.Errorf("unknown command [%s]", command)
 	}

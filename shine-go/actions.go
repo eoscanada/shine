@@ -4,12 +4,12 @@ import "github.com/eoscanada/eos-go"
 
 type addPraise struct {
 	Author  eos.SHA256Bytes
+	post    eos.SHA256Bytes
 	Praisee eos.SHA256Bytes
-	msgID   eos.SHA256Bytes
 	Memo    string
 }
 
-func newAddPraise(accountName eos.AccountName, author eos.SHA256Bytes, praisee eos.SHA256Bytes, memo string, msgID eos.SHA256Bytes) *eos.Action {
+func newAddPraise(accountName eos.AccountName, post eos.SHA256Bytes, author eos.SHA256Bytes, praisee eos.SHA256Bytes, memo string) *eos.Action {
 	a := &eos.Action{
 		Account: accountName,
 		Name:    eos.ActionName("addpraise"),
@@ -19,8 +19,8 @@ func newAddPraise(accountName eos.AccountName, author eos.SHA256Bytes, praisee e
 		Data: eos.NewActionData(
 			addPraise{
 				Author:  author,
+				post:    post,
 				Praisee: praisee,
-				msgID:   msgID,
 				Memo:    memo,
 			},
 		),

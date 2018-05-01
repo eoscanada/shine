@@ -4,7 +4,7 @@ import "github.com/eoscanada/eos-go"
 
 type addPraise struct {
 	Author  eos.SHA256Bytes
-	post    eos.SHA256Bytes
+	Post    eos.SHA256Bytes
 	Praisee eos.SHA256Bytes
 	Memo    string
 }
@@ -19,7 +19,7 @@ func newAddPraise(accountName eos.AccountName, post eos.SHA256Bytes, author eos.
 		Data: eos.NewActionData(
 			addPraise{
 				Author:  author,
-				post:    post,
+				Post:    post,
 				Praisee: praisee,
 				Memo:    memo,
 			},

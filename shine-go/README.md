@@ -5,7 +5,7 @@
 ####Clone and Run Shine**
 **Get Source**
 * git clone git@github.com:eoscanada/shine.git
-* cd $GOPATH/github.com:eoscanada/shine/shine-go
+* cd $GOPATH/src/github.com/eoscanada/shine/shine-go
 
 **Install Shine contract on node**     
 * go install github.com/eoscanada/shine/shine-go/cmd/setcode

@@ -173,15 +173,14 @@ void shine::clear(const uint64_t any) {
  */
 void shine::transfer(const asset& pot) {
   compute_rewards(pot);
+
   eosio_assert(has_rewards(), "cannot transfer pot without any rewards");
 
   std::for_each(rewards.begin(), rewards.end(), [&](auto& reward) {
     auto account_member_index = accounts.template get_index<N(member)>();
     auto account_member_itr = account_member_index.find(compute_member_id_key(reward.member));
-    if (account_member_itr == account_member_index.end()) {
-      eosio::print("No mapping from member to account name, no reward to transfer.");
-      return;
-    }
+
+    eosio_assert(account_member_itr != account_member_index.end(), "no mapping from member to account name, no reward to transfer")
 
     eosio::token_transfer transfer{_self, account_member_itr->id, reward.amount_total, ""};
     eosio::action(permission_level{_self, N(active)}, N(eosio.token), N(transfer), transfer).send();

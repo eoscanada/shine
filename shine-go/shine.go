@@ -2,13 +2,15 @@ package shine
 
 import (
 	"crypto/sha256"
+	"strings"
 
 	"io"
 
 	"fmt"
 
-	"github.com/eoscanada/eos-go"
 	"encoding/json"
+
+	"github.com/eoscanada/eos-go"
 )
 
 type Shine struct {
@@ -31,12 +33,22 @@ func hash(s string) eos.SHA256Bytes {
 
 }
 
-func (s *Shine) HandleCommand(fromUser, post string, command string,  params ...string) error {
+func (s *Shine) HandleCommand(fromUser, post string, command string) error {
 	var action *eos.Action
 
-	switch command {
-	case "recognize":
-		action = newAddPraise(s.accountName, hash(post), hash(fromUser), hash(params[0]), params[1])
+	commandParts := strings.Split(command, " ")
+	if len(commandParts) < 2 {
+		return fmt.Errorf("Command no clear [%s]", command)
+	}
+
+	switch commandParts[0] {
+	case "/recognize":
+		praisee := commandParts[1]
+		memo := strings.Join(commandParts[2:], " ")
+		action = newAddPraise(s.accountName, hash(post), hash(fromUser), hash(praisee), memo)
+	case "/upvote":
+		post := commandParts[1]
+		action = newAddVote(s.accountName, hash(post), hash(fromUser))
 	default:
 		return fmt.Errorf("unknown command [%s]", command)
 	}

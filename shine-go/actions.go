@@ -2,9 +2,6 @@ package shine
 
 import (
 	"github.com/eoscanada/eos-go"
-	"encoding/json"
-	"log"
-	"fmt"
 )
 
 type addPraise struct {
@@ -12,6 +9,11 @@ type addPraise struct {
 	Post    eos.SHA256Bytes
 	Praisee eos.SHA256Bytes
 	Memo    string
+}
+
+type addVote struct {
+	Voter eos.SHA256Bytes
+	Post  eos.SHA256Bytes
 }
 
 func newAddPraise(accountName eos.AccountName, post eos.SHA256Bytes, author eos.SHA256Bytes, praisee eos.SHA256Bytes, memo string) *eos.Action {
@@ -32,11 +34,24 @@ func newAddPraise(accountName eos.AccountName, post eos.SHA256Bytes, author eos.
 		Data: eos.NewActionData(p),
 	}
 
-	data, err := json.Marshal(p)
-	if err != nil {
-		log.Fatal(err)
+	return a
+}
+
+func newAddVote(accountName eos.AccountName, post eos.SHA256Bytes, voter eos.SHA256Bytes) *eos.Action {
+
+	p := addVote{
+		Voter: voter,
+		Post:  post,
 	}
-	fmt.Println("addPraise json: ", string(data))
+
+	a := &eos.Action{
+		Account: accountName,
+		Name:    eos.ActionName("addvote"),
+		Authorization: []eos.PermissionLevel{
+			{Actor: accountName, Permission: eos.PermissionName("active")},
+		},
+		Data: eos.NewActionData(p),
+	}
 
 	return a
 }

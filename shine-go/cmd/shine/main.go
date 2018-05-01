@@ -15,6 +15,7 @@ import (
 var accountNameString = flag.String("account-name", "shine", "Account name where to set shine code")
 var privateKey = flag.String("private-key", "", "Private key")
 var apiAddr = flag.String("api-addr", "http://localhost:8888", "RPC endpoint of the nodeos instance")
+
 func main() {
 
 	flag.Parse()
@@ -36,7 +37,12 @@ func main() {
 	api.SetSigner(keyBag)
 
 	shine := shine.NewShine(api, &accountName)
-	err = shine.HandleCommand("user.1", "post.1","recognize", "user.1", "msg.id.1", "bla bla bla")
+	err = shine.HandleCommand("user.1", "post.1", "/recognize user.1 for doing so and so")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = shine.HandleCommand("user.1", "post.2", "/upvote post.1")
 	if err != nil {
 		log.Fatal(err)
 	}

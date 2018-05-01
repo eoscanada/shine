@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/eoscanada/eos-go"
+	"encoding/json"
 )
 
 type Shine struct {
@@ -39,6 +40,9 @@ func (s *Shine) HandleCommand(fromUser, post string, command string,  params ...
 	default:
 		return fmt.Errorf("unknown command [%s]", command)
 	}
+
+	data, err := json.Marshal(action)
+	fmt.Println("Data in json: ", string(data))
 
 	actionResp, err := s.api.SignPushActions(action)
 	if err != nil {

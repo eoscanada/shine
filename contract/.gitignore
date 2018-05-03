@@ -1,3 +1,5 @@
 *.wast
 
 /.env
+
+.idea

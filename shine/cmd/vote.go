@@ -23,7 +23,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var postID int
+var votePostID int
 
 // voteCmd represents the vote command
 var voteCmd = &cobra.Command{
@@ -36,7 +36,7 @@ var voteCmd = &cobra.Command{
 		api := eos.New(nodeURL, chainID)
 		api.SetSigner(eos.NewWalletSigner(eos.New(walletURL, chainID), "default"))
 
-		action := NewVote(fromAccount, postID)
+		action := NewVote(fromAccount, votePostID)
 		json.NewEncoder(os.Stdout).Encode(action)
 		if _, err := api.SignPushActions(action); err != nil {
 			log.Fatalln(err)
@@ -47,10 +47,10 @@ var voteCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(voteCmd)
-	voteCmd.Flags().IntVarP(&postID, "post_id", "p", 0, "Specify the post-id")
+	voteCmd.Flags().IntVarP(&votePostID, "post_id", "p", 0, "Specify the post-id")
 }
 
-func NewVote(from string, postID int) *eos.Action {
+func NewVote(from string, votePostID int) *eos.Action {
 	return &eos.Action{
 		Account: eos.AccountName("shine"),
 		Name:    eos.ActionName("vote"),
@@ -59,7 +59,7 @@ func NewVote(from string, postID int) *eos.Action {
 		},
 		Data: eos.NewActionData(Vote{
 			From:   eos.AccountName(from),
-			PostID: uint64(postID),
+			PostID: uint64(votePostID),
 		}),
 	}
 }

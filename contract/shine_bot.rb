@@ -36,10 +36,7 @@ def ask_action(prompt, context)
   prompt.select('Action') do |menu|
     menu.choice 'Praise', :praise
     menu.choice 'Vote', :vote
-    menu.choice 'Bind Member', :bind_member
-    menu.choice 'Unbind Member', :unbind_member
     menu.choice 'Reset', :reset
-    menu.choice 'Clear', :clear
     menu.choice 'Scenario', :scenario
   end
 end
@@ -48,48 +45,46 @@ def perform_scenario(_prompt, context)
   contract = context[:contract]
 
   praises = [
-    { post: "0", author: 'matt', praisee: 'eve' },
-    { post: "1", author: 'matt', praisee: 'eve' },
-    { post: "2", author: 'evan', praisee: 'eve' },
-    { post: "3", author: 'eve', praisee: 'matt' },
-    { post: "4", author: 'mike', praisee: 'matt' },
-    { post: "5", author: 'mike', praisee: 'eve' },
-    { post: "6", author: 'mike', praisee: 'evan' },
+    { author: 'matt', praisee: 'eve' },
+    { author: 'matt', praisee: 'eve' },
+    { author: 'evan', praisee: 'eve' },
+    { author: 'eve', praisee: 'matt' },
+    { author: 'mike', praisee: 'matt' },
+    { author: 'mike', praisee: 'eve' },
+    { author: 'mike', praisee: 'evan' },
   ]
 
   votes = [
-    { voter: 'evan', post: '0' },
-    { voter: 'evan', post: '1' },
-    { voter: 'mike', post: '1' },
-    { voter: 'mike', post: '3' },
-    { voter: 'mike', post: '3' },
-    { voter: 'evan', post: '3' },
-    { voter: 'eve', post: '4' },
-    { voter: 'matt', post: '5' },
-    { voter: 'matt', post: '6' },
-    { voter: 'eve', post: '6' },
+    { voter: 'evan', praise_id: 0 },
+    { voter: 'evan', praise_id: 1 },
+    { voter: 'mike', praise_id: 1 },
+    { voter: 'mike', praise_id: 3 },
+    { voter: 'mike', praise_id: 3 },
+    { voter: 'evan', praise_id: 3 },
+    { voter: 'eve', praise_id: 4 },
+    { voter: 'matt', praise_id: 5 },
+    { voter: 'matt', praise_id: 6 },
+    { voter: 'eve', praise_id: 6 },
   ]
 
   praises.each do |praise|
     execute_praise(contract, {
-      post: sha256(praise[:post]),
-      author: sha256(praise[:author]),
-      praisee: sha256(praise[:praisee]),
+      author: praise[:author],
+      praisee: praise[:praisee],
       memo: "#{praise[:author]} -> #{praise[:praisee]}",
     })
   end
 
   votes.each do |vote|
     execute_vote(contract, {
-      post: sha256(vote[:post]),
-      voter: sha256(vote[:voter]),
+      praise_id: vote[:praise_id],
+      voter: vote[:voter],
     })
   end
 end
 
 def perform_praise(prompt, context)
   praise = {
-    post: ask_post(prompt, context, 'Post:', ENV['SHINE_BOT_POST']),
     author: ask_member_id(prompt, context, 'Author:', ENV['SHINE_BOT_AUTHOR']),
     praisee: ask_member_id(prompt, context, 'Praisee:', ENV['SHINE_BOT_PRAISEE']),
     memo: ask_memo(prompt, context),
@@ -103,7 +98,7 @@ def perform_praise(prompt, context)
 end
 
 def execute_praise(contract, praise)
-  execute_transaction(contract, 'addpraise', JSON.generate(praise))
+  execute_transaction(contract, praise[:author], 'addpraise', JSON.generate(praise))
 end
 
 def ask_memo(prompt, context)
@@ -118,7 +113,7 @@ end
 
 def perform_vote(prompt, context)
   vote = {
-    post: ask_post(prompt, context, 'Post: ', ENV['SHINE_BOT_POST']),
+    praise_id: ask_praise_id(prompt, context, 'Praise Id: ', ENV['SHINE_BOT_PRAISE_ID']),
     voter: ask_member_id(prompt, context, 'Voter: ', ENV['SHINE_BOT_VOTER']),
   }
 
@@ -130,7 +125,7 @@ def perform_vote(prompt, context)
 end
 
 def execute_vote(contract, vote)
-  execute_transaction(contract, 'addvote', JSON.generate(vote))
+  execute_transaction(contract, vote[:voter], 'addvote', JSON.generate(vote))
 end
 
 def ask_praise_id(prompt, context)
@@ -144,29 +139,12 @@ def ask_praise_id(prompt, context)
   end
 end
 
-def perform_bind_member(prompt, context)
-  puts execute_transaction(context[:contract], 'bindmember', JSON.generate({
-    member: ask_member_id(prompt, context, 'Member:', ENV['SHINE_BOT_BIND_MEMBER']),
-    account: ask_account(prompt, context, 'Account:', ENV['SHINE_BOT_BIND_ACCOUNT']),
-  }))
-end
-
-def perform_unbind_member(prompt, context)
-  puts execute_transaction(context[:contract], 'unbindmember', JSON.generate({
-    member: ask_member_id(prompt, context, 'Member:', ENV['SHINE_BOT_UNBIND_MEMBER']),
-  }))
-end
-
 def perform_reset(_prompt, context)
-  puts execute_transaction(context[:contract], 'reset', JSON.generate({ any: 0 }))
-end
-
-def perform_clear(_prompt, context)
-  puts execute_transaction(context[:contract], 'clear', JSON.generate({ any: 0 }))
+  puts execute_transaction(context[:contract], context[:contract], 'reset', JSON.generate({ any: 0 }))
 end
 
 def ask_account(prompt, context, text, default = nil)
-  return default if default && context[:quick_run]
+  return default if default
 
   prompt.ask(text) do |question|
     question.required true
@@ -175,23 +153,22 @@ def ask_account(prompt, context, text, default = nil)
   end
 end
 
-def ask_post(prompt, context, text, default)
-  return sha256(default) if default && context[:quick_run]
+def ask_praise_id(prompt, context, text, default)
+  return default if default
 
   prompt.ask(text) do |question|
     question.required true
     question.default default
-    question.convert -> (input) { sha256(input) }
+    question.validate /^\d+$/
   end
 end
 
 def ask_member_id(prompt, context, text, default)
-  return sha256(default) if default && context[:quick_run]
+  return default if default
 
   prompt.ask(text) do |question|
     question.required true
     question.default default
-    question.convert -> (input) { sha256(input) }
   end
 end
 
@@ -202,16 +179,13 @@ end
 def extract_default_action(arguments)
   return :praise if arguments_any?(arguments, '--praise')
   return :vote if arguments_any?(arguments, '--vote')
-  return :bind_member if arguments_any?(arguments, '--bind-member')
-  return :unbind_member if arguments_any?(arguments, '--unbind-member')
   return :reset if arguments_any?(arguments, '--reset')
-  return :clear if arguments_any?(arguments, '--clear')
   return :scenario if arguments_any?(arguments, '--scenario')
 
   ENV['SHINE_BOT_ACTION'].nil? ? nil : ENV['SHINE_BOT_ACTION'].to_sym
 end
 
-def execute_transaction(contract, action, data)
+def execute_transaction(contract, permission_account, action, data)
   execute_cleos([
     'push',
     'action',
@@ -220,13 +194,11 @@ def execute_transaction(contract, action, data)
     data,
     '--force-unique',
     '--permission',
-    "#{contract}@active"
+    "#{permission_account}@active"
   ])
 end
 
 def execute_cleos(arguments)
-  blockchain_host = ENV['BLOCKCHAIN_HOST']
-  blockchain_port = ENV['BLOCKCHAIN_PORT']
   wallet_host = ENV['WALLET_HOST']
   wallet_port = ENV['WALLET_PORT']
 

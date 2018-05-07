@@ -1,37 +1,20 @@
 {
   "types": [{
-    "new_type_name": "member_id",
-    "type": "checksum256"
-  }, {
-    "new_type_name": "post_id",
-    "type": "checksum256"
+    "new_type_name": "praise_id",
+    "type": "uint64"
   }],
   "structs": [{
-      "name": "account",
-      "base": "",
-      "fields": [{
-          "name": "id",
-          "type": "uint64"
-        }, {
-          "name": "member",
-          "type": "member_id"
-        }
-      ]
-    }, {
       "name": "praise",
       "base": "",
       "fields": [{
           "name": "id",
           "type": "uint64"
         }, {
-          "name": "post",
-          "type": "post_id"
-        }, {
           "name": "author",
-          "type": "member_id"
+          "type": "account_name"
         }, {
           "name": "praisee",
-          "type": "member_id"
+          "type": "account_name"
         }, {
           "name": "memo",
           "type": "string"
@@ -44,22 +27,19 @@
           "name": "id",
           "type": "uint64"
         }, {
-          "name": "post",
-          "type": "post_id"
+          "name": "praise_id",
+          "type": "praise_id"
         }, {
           "name": "voter",
-          "type": "member_id"
+          "type": "account_name"
         }
       ]
     }, {
       "name": "member_stat",
       "base": "",
       "fields": [{
-          "name": "id",
-          "type": "uint64"
-        }, {
-          "name": "member",
-          "type": "member_id"
+          "name": "account",
+          "type": "account_name"
         }, {
           "name": "praise_posted",
           "type": "uint64"
@@ -81,11 +61,8 @@
       "name": "reward",
       "base": "",
       "fields": [{
-          "name": "id",
-          "type": "uint64"
-        }, {
-          "name": "member",
-          "type": "member_id"
+          "name": "account",
+          "type": "account_name"
         }, {
           "name": "amount_praise_posted",
           "type": "asset"
@@ -94,9 +71,6 @@
           "type": "asset"
         }, {
           "name": "amount_vote_given",
-          "type": "asset"
-        }, {
-          "name": "amount_extra",
           "type": "asset"
         }, {
           "name": "amount_total",
@@ -109,14 +83,11 @@
       "name": "addpraise",
       "base": "",
       "fields": [{
-          "name": "post",
-          "type": "post_id"
-        }, {
           "name": "author",
-          "type": "member_id"
+          "type": "account_name"
         }, {
           "name": "praisee",
-          "type": "member_id"
+          "type": "account_name"
         }, {
           "name": "memo",
           "type": "string"
@@ -126,42 +97,15 @@
       "name": "addvote",
       "base": "",
       "fields": [{
-          "name": "post",
-          "type": "post_id"
+          "name": "praise_id",
+          "type": "praise_id"
         }, {
           "name": "voter",
-          "type": "member_id"
-        }
-      ]
-    }, {
-      "name": "bindmember",
-      "base": "",
-      "fields": [{
-          "name": "member",
-          "type": "member_id"
-        }, {
-          "name": "account",
           "type": "account_name"
         }
       ]
     }, {
-      "name": "unbindmember",
-      "base": "",
-      "fields": [{
-          "name": "member",
-          "type": "member_id"
-        }
-      ]
-    }, {
       "name": "reset",
-      "base": "",
-      "fields": [{
-          "name": "any",
-          "type": "uint64"
-        }
-      ]
-    }, {
-      "name": "clear",
       "base": "",
       "fields": [{
           "name": "any",
@@ -177,30 +121,11 @@
       "name": "addvote",
       "type": "addvote"
     }, {
-      "name": "bindmember",
-      "type": "bindmember"
-    }, {
-      "name": "unbindmember",
-      "type": "unbindmember"
-    }, {
       "name": "reset",
       "type": "reset"
-    }, {
-      "name": "clear",
-      "type": "clear"
     }
   ],
   "tables": [{
-      "name": "accounts",
-      "index_type": "i64",
-      "key_names": [
-        "id"
-      ],
-      "key_types": [
-        "uint64"
-      ],
-      "type": "account"
-    }, {
       "name": "praises",
       "index_type": "i64",
       "key_names": [
@@ -224,7 +149,7 @@
       "name": "memberstats",
       "index_type": "i64",
       "key_names": [
-        "id"
+        "account"
       ],
       "key_types": [
         "uint64"
@@ -234,7 +159,7 @@
       "name": "rewards",
       "index_type": "i64",
       "key_names": [
-        "id"
+        "account"
       ],
       "key_types": [
         "uint64"

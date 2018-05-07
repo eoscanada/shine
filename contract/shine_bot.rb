@@ -34,7 +34,7 @@ def ask_action(prompt, context)
   return default if default
 
   prompt.select('Action') do |menu|
-    menu.choice 'Praise', :praise
+    menu.choice 'Post', :post
     menu.choice 'Vote', :vote
     menu.choice 'Reset', :reset
     menu.choice 'Scenario', :scenario
@@ -44,61 +44,61 @@ end
 def perform_scenario(_prompt, context)
   contract = context[:contract]
 
-  praises = [
-    { author: 'matt', praisee: 'eve' },
-    { author: 'matt', praisee: 'eve' },
-    { author: 'evan', praisee: 'eve' },
-    { author: 'eve', praisee: 'matt' },
-    { author: 'mike', praisee: 'matt' },
-    { author: 'mike', praisee: 'eve' },
-    { author: 'mike', praisee: 'evan' },
+  posts = [
+    { from: 'matt', to: 'eve' },
+    { from: 'matt', to: 'eve' },
+    { from: 'evan', to: 'eve' },
+    { from: 'eve', to: 'matt' },
+    { from: 'mike', to: 'matt' },
+    { from: 'mike', to: 'eve' },
+    { from: 'mike', to: 'evan' },
   ]
 
   votes = [
-    { voter: 'evan', praise_id: 0 },
-    { voter: 'evan', praise_id: 1 },
-    { voter: 'mike', praise_id: 1 },
-    { voter: 'mike', praise_id: 3 },
-    { voter: 'mike', praise_id: 3 },
-    { voter: 'evan', praise_id: 3 },
-    { voter: 'eve', praise_id: 4 },
-    { voter: 'matt', praise_id: 5 },
-    { voter: 'matt', praise_id: 6 },
-    { voter: 'eve', praise_id: 6 },
+    { voter: 'evan', post_id: 0 },
+    { voter: 'evan', post_id: 1 },
+    { voter: 'mike', post_id: 1 },
+    { voter: 'mike', post_id: 3 },
+    { voter: 'mike', post_id: 3 },
+    { voter: 'evan', post_id: 3 },
+    { voter: 'eve', post_id: 4 },
+    { voter: 'matt', post_id: 5 },
+    { voter: 'matt', post_id: 6 },
+    { voter: 'eve', post_id: 6 },
   ]
 
-  praises.each do |praise|
-    execute_praise(contract, {
-      author: praise[:author],
-      praisee: praise[:praisee],
-      memo: "#{praise[:author]} -> #{praise[:praisee]}",
+  posts.each do |post|
+    execute_post(contract, {
+      from: post[:from],
+      to: post[:to],
+      memo: "#{post[:from]} -> #{post[:to]}",
     })
   end
 
   votes.each do |vote|
     execute_vote(contract, {
-      praise_id: vote[:praise_id],
+      post_id: vote[:post_id],
       voter: vote[:voter],
     })
   end
 end
 
-def perform_praise(prompt, context)
-  praise = {
-    author: ask_member_id(prompt, context, 'Author:', ENV['SHINE_BOT_AUTHOR']),
-    praisee: ask_member_id(prompt, context, 'Praisee:', ENV['SHINE_BOT_PRAISEE']),
+def perform_post(prompt, context)
+  post = {
+    from: ask_account(prompt, context, 'From:', ENV['SHINE_BOT_FROM']),
+    to: ask_account(prompt, context, 'To:', ENV['SHINE_BOT_TO']),
     memo: ask_memo(prompt, context),
   }
 
   puts 'Data:'
-  puts JSON.pretty_generate(praise)
+  puts JSON.pretty_generate(post)
   puts ''
 
-  puts execute_praise(context[:contract], praise)
+  puts execute_post(context[:contract], post)
 end
 
-def execute_praise(contract, praise)
-  execute_transaction(contract, praise[:author], 'addpraise', JSON.generate(praise))
+def execute_post(contract, post)
+  execute_transaction(contract, post[:from], 'post', JSON.generate(post))
 end
 
 def ask_memo(prompt, context)
@@ -113,8 +113,8 @@ end
 
 def perform_vote(prompt, context)
   vote = {
-    praise_id: ask_praise_id(prompt, context, 'Praise Id: ', ENV['SHINE_BOT_PRAISE_ID']),
-    voter: ask_member_id(prompt, context, 'Voter: ', ENV['SHINE_BOT_VOTER']),
+    voter: ask_account(prompt, context, 'Voter: ', ENV['SHINE_BOT_VOTER']),
+    post_id: ask_post_id(prompt, context, 'Post Id: ', ENV['SHINE_BOT_POST_ID']),
   }
 
   puts 'Data:'
@@ -125,14 +125,14 @@ def perform_vote(prompt, context)
 end
 
 def execute_vote(contract, vote)
-  execute_transaction(contract, vote[:voter], 'addvote', JSON.generate(vote))
+  execute_transaction(contract, vote[:voter], 'vote', JSON.generate(vote))
 end
 
-def ask_praise_id(prompt, context)
-  default = ENV['SHINE_BOT_PRAISE_ID']
+def ask_post_id(prompt, context)
+  default = ENV['SHINE_BOT_POST_ID']
   return default if default && context[:quick_run]
 
-  prompt.ask('Praise ID:') do |question|
+  prompt.ask('post ID:') do |question|
     question.required true
     question.validate /[0-9]+/
     question.convert -> (input) { input.to_i }
@@ -153,7 +153,7 @@ def ask_account(prompt, context, text, default = nil)
   end
 end
 
-def ask_praise_id(prompt, context, text, default)
+def ask_post_id(prompt, context, text, default)
   return default if default
 
   prompt.ask(text) do |question|
@@ -163,21 +163,12 @@ def ask_praise_id(prompt, context, text, default)
   end
 end
 
-def ask_member_id(prompt, context, text, default)
-  return default if default
-
-  prompt.ask(text) do |question|
-    question.required true
-    question.default default
-  end
-end
-
 def arguments_any?(arguments, *flags)
   arguments.any? { |input| flags.include? input }
 end
 
 def extract_default_action(arguments)
-  return :praise if arguments_any?(arguments, '--praise')
+  return :post if arguments_any?(arguments, '--post')
   return :vote if arguments_any?(arguments, '--vote')
   return :reset if arguments_any?(arguments, '--reset')
   return :scenario if arguments_any?(arguments, '--scenario')

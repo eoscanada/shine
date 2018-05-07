@@ -1,19 +1,19 @@
 {
   "types": [{
-    "new_type_name": "praise_id",
+    "new_type_name": "post_id",
     "type": "uint64"
   }],
   "structs": [{
-      "name": "praise",
+      "name": "post_row",
       "base": "",
       "fields": [{
           "name": "id",
           "type": "uint64"
         }, {
-          "name": "author",
+          "name": "from",
           "type": "account_name"
         }, {
-          "name": "praisee",
+          "name": "to",
           "type": "account_name"
         }, {
           "name": "memo",
@@ -21,30 +21,30 @@
         }
       ]
     }, {
-      "name": "vote",
+      "name": "vote_row",
       "base": "",
       "fields": [{
           "name": "id",
           "type": "uint64"
         }, {
-          "name": "praise_id",
-          "type": "praise_id"
-        }, {
           "name": "voter",
           "type": "account_name"
+        }, {
+          "name": "post_id",
+          "type": "post_id"
         }
       ]
     }, {
-      "name": "member_stat",
+      "name": "member_stat_row",
       "base": "",
       "fields": [{
           "name": "account",
           "type": "account_name"
         }, {
-          "name": "praise_posted",
+          "name": "post_count",
           "type": "uint64"
         }, {
-          "name": "praise_vote_received",
+          "name": "post_vote_received",
           "type": "uint64"
         }, {
           "name": "vote_given_explicit",
@@ -58,13 +58,13 @@
         }
       ]
     }, {
-      "name": "reward",
+      "name": "reward_row",
       "base": "",
       "fields": [{
           "name": "account",
           "type": "account_name"
         }, {
-          "name": "amount_praise_posted",
+          "name": "amount_post_count",
           "type": "asset"
         }, {
           "name": "amount_vote_received",
@@ -80,13 +80,13 @@
     },
 
     {
-      "name": "addpraise",
+      "name": "post",
       "base": "",
       "fields": [{
-          "name": "author",
+          "name": "from",
           "type": "account_name"
         }, {
-          "name": "praisee",
+          "name": "to",
           "type": "account_name"
         }, {
           "name": "memo",
@@ -94,14 +94,14 @@
         }
       ]
     }, {
-      "name": "addvote",
+      "name": "vote",
       "base": "",
       "fields": [{
-          "name": "praise_id",
-          "type": "praise_id"
-        }, {
           "name": "voter",
           "type": "account_name"
+        }, {
+          "name": "post_id",
+          "type": "post_id"
         }
       ]
     }, {
@@ -115,18 +115,18 @@
     }
   ],
   "actions": [{
-      "name": "addpraise",
-      "type": "addpraise"
+      "name": "post",
+      "type": "post"
     }, {
-      "name": "addvote",
-      "type": "addvote"
+      "name": "vote",
+      "type": "vote"
     }, {
       "name": "reset",
       "type": "reset"
     }
   ],
   "tables": [{
-      "name": "praises",
+      "name": "posts",
       "index_type": "i64",
       "key_names": [
         "id"
@@ -134,7 +134,7 @@
       "key_types": [
         "uint64"
       ],
-      "type": "praise"
+      "type": "post_row"
     }, {
       "name": "votes",
       "index_type": "i64",
@@ -144,7 +144,7 @@
       "key_types": [
         "uint64"
       ],
-      "type": "vote"
+      "type": "vote_row"
     }, {
       "name": "memberstats",
       "index_type": "i64",
@@ -154,7 +154,7 @@
       "key_types": [
         "uint64"
       ],
-      "type": "member_stat"
+      "type": "member_stat_row"
     }, {
       "name": "rewards",
       "index_type": "i64",
@@ -164,7 +164,7 @@
       "key_types": [
         "uint64"
       ],
-      "type": "reward"
+      "type": "reward_row"
     }
   ]
 }

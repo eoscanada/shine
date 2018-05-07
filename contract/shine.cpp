@@ -15,7 +15,7 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
   if (code == self) {
     // Don't rename `thiscontract`, it's being use verbatim in `EOSIO_API` macro
     shine thiscontract(self);
-    switch (action) { EOSIO_API(shine, (addpraise)(addvote)(reset)) }
+    switch (action) { EOSIO_API(shine, (post)(vote)(reset)) }
 
     eosio_exit(0);
   }
@@ -37,45 +37,45 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
 //// Actions
 ///
 
-void shine::addpraise(const account_name author, const account_name praisee, const string& memo) {
-  require_active_auth(author);
+void shine::post(const account_name from, const account_name to, const string& memo) {
+  require_active_auth(from);
 
-  auto praise_itr = praises.emplace(_self, [&](auto& praise) {
-    praise.id = praises.available_primary_key();
-    praise.author = author;
-    praise.praisee = praisee;
-    praise.memo = memo;
+  auto post_itr = posts.emplace(_self, [&](auto& post) {
+    post.id = posts.available_primary_key();
+    post.from = from;
+    post.to = to;
+    post.memo = memo;
   });
 
-  update_member_stat(author, [](auto& stat) { stat.praise_posted += 1; });
-  update_member_stat(praisee, [](auto& stat) { stat.vote_received_implicit += 1; });
+  update_member_stat(from, [](auto& stat) { stat.post_count += 1; });
+  update_member_stat(to, [](auto& stat) { stat.vote_received_implicit += 1; });
 }
 
-void shine::addvote(const praise_id praise_id, const account_name voter) {
+void shine::vote(const account_name voter, const post_id post_id) {
   require_active_auth(voter);
 
-  auto praise_itr = praises.find(praise_id);
-  eosio_assert(praise_itr != praises.end(), "Praise with this id does not exist.");
+  auto post_itr = posts.find(post_id);
+  eosio_assert(post_itr != posts.end(), "post with this id does not exist.");
 
   votes.emplace(_self, [&](auto& vote) {
     vote.id = votes.available_primary_key();
-    vote.praise_id = praise_id;
     vote.voter = voter;
+    vote.post_id = post_id;
   });
 
   update_member_stat(voter, [](auto& stat) { stat.vote_given_explicit += 1; });
-  update_member_stat(praise_itr->praisee, [](auto& stat) { stat.vote_received_explicit += 1; });
-  update_member_stat(praise_itr->author, [](auto& stat) { stat.praise_vote_received += 1; });
+  update_member_stat(post_itr->to, [](auto& stat) { stat.vote_received_explicit += 1; });
+  update_member_stat(post_itr->from, [](auto& stat) { stat.post_vote_received += 1; });
 }
 
 /**
- * Reset statistics for praises, votes, stats and rewards. Mapping between
+ * Reset statistics for posts, votes, stats and rewards. Mapping between
  * member and account will be kept.
  */
 void shine::reset(const uint64_t any) {
   require_active_auth(_self);
 
-  table::clear(praises);
+  table::clear(posts);
   table::clear(votes);
   table::clear(stats);
   table::clear(rewards);
@@ -103,15 +103,15 @@ void shine::transfer(const asset& pot) {
  * for each member:
  *  + The amount of vote received
  *  + The amount of vote given
- *  + The amount of praise posted
+ *  + The amount of post posted
  *
  * Base on these three values, a weight is computed for each of them:
  *  + Vote received -> Proportional to total vote count (explicit + implicit)
  *  + Vote given -> Proportional to total of vote given weight (1 vote -> 1/3, 2 votes -> 2/3, 2+ votes -> 3/3)
- *  + Praise posted -> Propotional to total explicite vote count.
+ *  + post posted -> Propotional to total explicite vote count.
  *
  * The algorithm first loop through all member stats to compute global
- * stats (total vote, total praise, etc).
+ * stats (total vote, total post, etc).
  *
  * Then, it computes the rewards for each member that has a bound EOS account.
  * The amount of distributed tokens is also being accumulated. When all member
@@ -145,11 +145,11 @@ void shine::compute_rewards(const asset& pot) {
 
 void shine::compute_global_stats(distribution_stat& distribution) {
   for_each(stats.begin(), stats.end(), [&](auto& stat) {
-    auto praised_posted = stat.praise_posted;
+    auto postd_posted = stat.post_count;
     auto vote_given = stat.vote_given_explicit;
 
     distribution.vote_explicit += vote_given;
-    distribution.vote_total += praised_posted + vote_given;
+    distribution.vote_total += postd_posted + vote_given;
     distribution.vote_given_weighted_total += vote_given * compute_vote_given_weight(vote_given);
   });
 }
@@ -163,20 +163,20 @@ void shine::distribute_rewards(const asset& pot, distribution_stat& distribution
     auto& stat = *itr;
 
     auto vote_received = stat.vote_received_explicit + stat.vote_received_implicit;
-    auto praise_vote_received = stat.praise_vote_received;
+    auto post_vote_received = stat.post_vote_received;
     auto vote_given = stat.vote_given_explicit;
 
     auto vote_given_weights = compute_vote_given_weight(vote_given);
     auto vote_given_weighted = vote_given * vote_given_weights;
 
     auto vote_received_weight = vote_received / (double)distribution.vote_total;
-    auto praise_posted_weight = praise_vote_received / (double)distribution.vote_explicit;
+    auto post_count_weight = post_vote_received / (double)distribution.vote_explicit;
     auto vote_given_weight = vote_given_weighted / distribution.vote_given_weighted_total;
 
     auto vote_received_amount = double_to_asset(vote_received_weight * pot_amount * REWARD_VOTE_RECEIVED_WEIGHT);
-    auto praise_posted_amount = double_to_asset(praise_posted_weight * pot_amount * REWARD_PRAISE_POSTED_WEIGHT);
+    auto post_count_amount = double_to_asset(post_count_weight * pot_amount * REWARD_post_count_WEIGHT);
     auto vote_given_amount = double_to_asset(vote_given_weight * pot_amount * REWARD_VOTE_GIVEN_WEIGHT);
-    auto amount_total = vote_received_amount + praise_posted_amount + vote_given_amount;
+    auto amount_total = vote_received_amount + post_count_amount + vote_given_amount;
 
     balance -= amount_total;
     if (itr == last_member_itr) {
@@ -186,7 +186,7 @@ void shine::distribute_rewards(const asset& pot, distribution_stat& distribution
     distribution.distributed_pot += amount_total;
 
     update_reward_for_member(stat.account, [&](auto& reward) {
-      reward.amount_praise_posted = praise_posted_amount;
+      reward.amount_post_count = post_count_amount;
       reward.amount_vote_received = vote_received_amount;
       reward.amount_vote_given = vote_given_amount;
       reward.amount_total = amount_total;
@@ -198,7 +198,7 @@ void shine::distribute_rewards(const asset& pot, distribution_stat& distribution
 //// Helpers
 ///
 
-void shine::update_reward_for_member(const account_name account, const function<void(reward&)> updater) {
+void shine::update_reward_for_member(const account_name account, const function<void(reward_row&)> updater) {
   auto reward_itr = rewards.find(account);
   if (reward_itr == rewards.end()) {
     rewards.emplace(_self, [&](auto& reward) {
@@ -210,7 +210,7 @@ void shine::update_reward_for_member(const account_name account, const function<
   }
 }
 
-void shine::update_member_stat(const account_name account, const function<void(member_stat&)> updater) {
+void shine::update_member_stat(const account_name account, const function<void(member_stat_row&)> updater) {
   auto stat_itr = stats.find(account);
   if (stat_itr == stats.end()) {
     stats.emplace(_self, [&](auto& stat) {

@@ -11,7 +11,7 @@
 #include "table.hpp"
 
 // Configurable values
-#define REWARD_PRAISE_POSTED_WEIGHT 0.07
+#define REWARD_post_count_WEIGHT 0.07
 #define REWARD_VOTE_RECEIVED_WEIGHT 0.9
 #define REWARD_VOTE_GIVEN_WEIGHT 0.03
 
@@ -32,7 +32,7 @@ using std::string;
 using namespace eoscanada;
 
 // Typedefs
-typedef uint64_t praise_id;
+typedef uint64_t post_id;
 
 namespace eosio {
 /**
@@ -60,70 +60,70 @@ class shine : public eosio::contract {
 
   shine(account_name contract_account)
       : eosio::contract(contract_account),
-        praises(contract_account, contract_account),
+        posts(contract_account, contract_account),
         votes(contract_account, contract_account),
         stats(contract_account, contract_account),
         rewards(contract_account, contract_account) {}
 
   // Actions
-  void addpraise(const account_name author, const account_name praisee, const string& memo);
-  void addvote(const praise_id praise_id, const account_name voter);
+  void post(const account_name from, const account_name to, const string& memo);
+  void vote(const account_name voter, const post_id post_id);
   void reset(const uint64_t any);
 
   // Notifications
   void transfer(const asset& pot);
 
  private:
-  //@abi table praises i64
-  struct praise {
+  //@abi table posts i64
+  struct post_row {
     uint64_t id;
-    account_name author;
-    account_name praisee;
+    account_name from;
+    account_name to;
     string memo;
 
     uint64_t primary_key() const { return id; }
 
-    void print() const { eosio::print("Praise (", eosio::name{id}, ")"); }
+    void print() const { eosio::print("Post (", eosio::name{id}, ")"); }
 
-    EOSLIB_SERIALIZE(praise, (id)(author)(praisee)(memo))
+    EOSLIB_SERIALIZE(post_row, (id)(from)(to)(memo))
   };
 
-  typedef eosio::multi_index<TABLE(praises), praise> praises_index;
+  typedef eosio::multi_index<TABLE(posts), post_row> posts_index;
 
   //@abi table votes i64
-  struct vote {
+  struct vote_row {
     uint64_t id;
-    praise_id praise_id;
     account_name voter;
+    post_id post_id;
 
     uint64_t primary_key() const { return id; }
 
     void print() const { eosio::print("Vote (", eosio::name{id}, ")"); }
 
-    EOSLIB_SERIALIZE(vote, (id)(praise_id)(voter))
+    EOSLIB_SERIALIZE(vote_row, (id)(voter)(post_id))
   };
 
-  typedef eosio::multi_index<TABLE(votes), vote> votes_index;
+  typedef eosio::multi_index<TABLE(votes), vote_row> votes_index;
 
   //@abi table memberstats i64
   /**
-   * praise_posted - The praise count posted by the member
-   * praise_vote_received - The amount of vote received for all praise posted by the member
-   * vote_given_explicit - The amout of vote the member did on other member praises
-   * vote_received_implicit - The amount of implicit vote (vote by the author of the praise) received
-   * vote_received_explicit - The amount of explicit vote (voty by other members than author of praise) received
+   * post_count - The post count posted by the member
+   * post_vote_received - The amount of vote received for all post posted by the member
+   * vote_given_explicit - The amout of vote the member did on other member posts
+   * vote_received_implicit - The amount of implicit vote (vote by the author of the post) received
+   * vote_received_explicit - The amount of explicit vote (voty by other members than author of post) received
    */
-  struct member_stat {
+  struct member_stat_row {
     account_name account;
-    uint64_t praise_posted;
-    uint64_t praise_vote_received;
+    uint64_t post_count;
+    uint64_t post_vote_received;
     uint64_t vote_given_explicit;
     uint64_t vote_received_implicit;
     uint64_t vote_received_explicit;
 
-    member_stat()
-        : praise_posted(0),
-          praise_vote_received(0),
+    member_stat_row()
+        : post_count(0),
+          post_vote_received(0),
           vote_given_explicit(0),
           vote_received_implicit(0),
           vote_received_explicit(0) {}
@@ -132,16 +132,16 @@ class shine : public eosio::contract {
 
     void print() const { eosio::print("Member stat (", eosio::name{account}, ")"); }
 
-    EOSLIB_SERIALIZE(member_stat, (account)(praise_posted)(praise_vote_received)(vote_given_explicit)(
-                                      vote_received_implicit)(vote_received_explicit))
+    EOSLIB_SERIALIZE(member_stat_row, (account)(post_count)(post_vote_received)(vote_given_explicit)(
+                                          vote_received_implicit)(vote_received_explicit))
   };
 
-  typedef eosio::multi_index<TABLE(memberstats), member_stat> member_stats_index;
+  typedef eosio::multi_index<TABLE(memberstats), member_stat_row> member_stats_index;
 
   //@abi table rewards i64
-  struct reward {
+  struct reward_row {
     account_name account;
-    asset amount_praise_posted;
+    asset amount_post_count;
     asset amount_vote_received;
     asset amount_vote_given;
     asset amount_total;
@@ -150,10 +150,10 @@ class shine : public eosio::contract {
 
     void print() const { eosio::print("Reward (", eosio::name{account}, ")"); }
 
-    EOSLIB_SERIALIZE(reward, (account)(amount_praise_posted)(amount_vote_received)(amount_vote_given)(amount_total))
+    EOSLIB_SERIALIZE(reward_row, (account)(amount_post_count)(amount_vote_received)(amount_vote_given)(amount_total))
   };
 
-  typedef eosio::multi_index<TABLE(rewards), reward> rewards_index;
+  typedef eosio::multi_index<TABLE(rewards), reward_row> rewards_index;
 
   struct distribution_stat {
     uint64_t vote_explicit;
@@ -182,10 +182,10 @@ class shine : public eosio::contract {
 
   bool has_rewards() const { return rewards.begin() != rewards.end(); }
   void require_active_auth(const account_name account) const { require_auth(permission_level{account, N(active)}); }
-  void update_member_stat(const account_name account, const function<void(member_stat&)> updater);
-  void update_reward_for_member(const account_name account, const function<void(reward&)> updater);
+  void update_member_stat(const account_name account, const function<void(member_stat_row&)> updater);
+  void update_reward_for_member(const account_name account, const function<void(reward_row&)> updater);
 
-  praises_index praises;
+  posts_index posts;
   votes_index votes;
   member_stats_index stats;
   rewards_index rewards;

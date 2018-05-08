@@ -14,10 +14,8 @@
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
-	"os"
 
 	eos "github.com/eoscanada/eos-go"
 	"github.com/spf13/cobra"
@@ -27,30 +25,29 @@ var votePostID int
 
 // voteCmd represents the vote command
 var voteCmd = &cobra.Command{
-	Use:   "vote",
-	Short: "Vote for a post",
-	Long:  `vote --from [my account] -p [post_id]`,
+	Use: "vote -f from -p post_id",
 	Run: func(cmd *cobra.Command, args []string) {
 		chainID := make([]byte, 32, 32)
+		api := eos.New("http://localhost:8888", chainID)
 
-		api := eos.New(nodeURL, chainID)
-		api.SetSigner(eos.NewWalletSigner(eos.New(walletURL, chainID), "default"))
+		api.SetSigner(eos.NewWalletSigner(eos.New("http://localhost:6667", chainID), "default"))
 
-		action := NewVote(fromAccount, votePostID)
-		json.NewEncoder(os.Stdout).Encode(action)
-		if _, err := api.SignPushActions(action); err != nil {
+		_, err := api.SignPushActions(
+			NewVote(fromAccount, votePostID),
+		)
+		if err != nil {
 			log.Fatalln(err)
 		}
-		fmt.Println("Done")
+		fmt.Println("vote called")
 	},
 }
 
 func init() {
 	RootCmd.AddCommand(voteCmd)
-	voteCmd.Flags().IntVarP(&votePostID, "post_id", "p", 0, "Specify the post-id")
+	voteCmd.Flags().IntVarP(&votePostID, "post-id", "p", 0, "The post_id")
 }
 
-func NewVote(from string, votePostID int) *eos.Action {
+func NewVote(from string, postID int) *eos.Action {
 	return &eos.Action{
 		Account: eos.AccountName("shine"),
 		Name:    eos.ActionName("vote"),
@@ -58,13 +55,13 @@ func NewVote(from string, votePostID int) *eos.Action {
 			{Actor: eos.AccountName(from), Permission: eos.PermissionName("active")},
 		},
 		Data: eos.NewActionData(Vote{
-			From:   eos.AccountName(from),
-			PostID: uint64(votePostID),
+			Voter: eos.AccountName(from),
+			PostID: uint64(postID),
 		}),
 	}
 }
 
 type Vote struct {
-	From   eos.AccountName `json:"from"`
+	Voter  eos.AccountName `json:"voter"`
 	PostID uint64          `json:"post_id"`
 }

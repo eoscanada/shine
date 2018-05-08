@@ -23,19 +23,21 @@ import (
 
 // postCmd represents the post command
 var postCmd = &cobra.Command{
-	Use:   "post --from=account [account] [message]",
-	Short: "Submit a new post to the rewards system",
-	Args:  cobra.ExactArgs(2),
+	Use:  "post -f [account] [to] [memo]",
+	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		chainID := make([]byte, 32, 32)
+		api := eos.New("http://localhost:8888", chainID)
 
-		api := eos.New(nodeURL, chainID)
-		api.SetSigner(eos.NewWalletSigner(eos.New(walletURL, chainID), "default"))
+		api.SetSigner(eos.NewWalletSigner(eos.New("http://localhost:6667", chainID), "default"))
 
-		if _, err := api.SignPushActions(NewPost(fromAccount, args[0], args[1])); err != nil {
+		_, err := api.SignPushActions(
+			NewPost(fromAccount, args[0], args[1]),
+		)
+		if err != nil {
 			log.Fatalln(err)
 		}
-		fmt.Println("Done")
+		fmt.Println("post called")
 	},
 }
 
@@ -43,7 +45,7 @@ func init() {
 	RootCmd.AddCommand(postCmd)
 }
 
-func NewPost(from, to, message string) *eos.Action {
+func NewPost(from, to, memo string) *eos.Action {
 	return &eos.Action{
 		Account: eos.AccountName("shine"),
 		Name:    eos.ActionName("post"),
@@ -53,7 +55,7 @@ func NewPost(from, to, message string) *eos.Action {
 		Data: eos.NewActionData(Post{
 			From: eos.AccountName(from),
 			To:   eos.AccountName(to),
-			Memo: message,
+			Memo: memo,
 		}),
 	}
 }

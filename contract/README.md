@@ -1,109 +1,108 @@
-## EOS Shine SmartContract
+## EOS Shine Smart Contract
 
-This document describes various aspects of the EOS Shine SmartContract
+This document describes various aspects of the EOS Shine smart contract
 implementation ranging from architecture, building, troubleshooting, etc.
 
 Moreover, this document also contains various information about EOS
-SmartContract in general, mainly aimed at the developer audience.
-
-### Architecture & Features
-
-The Shine contract goal is to enable the implementation of a recognition
-system based on praise and votes. Person (i.e. account) broadcast a praise
-to all other members. Each member (i.e. account) can then vote for this
-particular praise.
-
-TBC
+smart contract in general, mainly aimed at the developer audience.
 
 #### Actions
 
-* `praise` (`addpraise`) - Create a praise in the blockchain.
-* `vote` (`addvote`) - Vote for a given praise in the blockchain.
-* `rewards` (`calcrewards`) - Update the rewards table in the blockchain.
+* `post` - Create a post in the blockchain.
+* `vote` - Vote for a given praise in the blockchain.
+* `reset` - Reset all collected stats to initial state.
 
 ### Development
 
-#### Prerequisites
+#### Compilation
 
-For development, ideally you would have a testnet running on your machine
-executing the EOS blockchain by configuring a local environment. Follow the instructions at https://github.com/EOSIO/eos/wiki/Local-Environment and when you have a `nodeos`
-running with a producer emitting blocks, come back here.
+##### Docker
 
-There is a `shine_bot.rb` script that enables to interact with the contract
-in a more rapid way. For this you will need Ruby 2.4+ installed along with the
-following dependency installed globally:
+The easiest way to compile is by using EOS Canada `gcr.io/eoscanada-public/eosio-wasmsdk`
+Docker image.
 
-```
-gem install 'tty-prompt'
-```
-
-Note that this is not needed if you don't plan on using the
-
-#### Preparation
-
-Let's prepare for the development of EOS Shine SmartContract. We will
-need an account on a running blockchain. It's quite possible to run
-you own test blockchain on your machine for development purposes.
-
-Let's create the account by creating two EOS key sets (first one for owner
-permission second one for active permission). Note the private keys outputted
-somewhere as we will need them in later section:
-
-**Note** You will need to have `eosios@active` private key imported into a
-wallet for the account creation to work. Import it using `cleos wallet import <private_key>`.
+While at the root of this project:
 
 ```
-# Owner
-cleos create key
-Private key: 5H123
-Public key: EOSXYZ
-
-# Active
-cleos create key
-Private key: 5B456
-Public key: EOSABC
-
-cleos create account eosio shine EOSXYZ EOSABC
+cd contract
+docker run --rm -it -v `pwd`:/shine -w /shine gcr.io/eoscanada-public/eosio-wasmsdk:v1.1.1 bash build.sh
 ```
 
-Once the account is created, let's import the owner and active private keys
-into the default wallet (you are free to use another wallet also):
+You will find the compiled `shine.abi` and `shine.wasm` in the `build` directory.
 
-**Note** Ensures that the wallet is unlocked prior doing this operation. You
-can unlock it by using `cleos wallet unlock` and entering the wallet password
-that was outputted at wallet creation time.
+##### Locally
 
-```
-# Of course, change 5H123 and 5B456 by real owner & active private keys respectively
-cleos wallet import 5H123
-cleos wallet import 5B456
-```
+Ensure that you have `https://github.com/EOSIO/eosio.wasmsdk` compiled locally.
 
-We are then good to go. Note that if the blockchain node is stopped,
-wallet will need to be unlocked again prior doing any operations
-in the upcoming sections.
-
-#### Building & Testing
-
-Building the SmartContract ABI and code to WAST is performed through
-the `eosiocpp` command line utility. Navigate to the root folder
-of this project and then issue:
+While at the root of this project:
 
 ```
-eosiocpp -o shine.wast shine.cpp
+./build.sh
 ```
 
-Once the WAST has been generated correctly, next step is to set the contract
-on the account `shine` that was created in the preparation step:
+You will find the compiled `shine.abi` and `shine.wasm` in the `build` directory.
+
+#### Installation
+
+While at the root of this project:
 
 ```
-cleos set contract shine `pwd`
+cd contract
+cleos set contract shine build build/shine.wasm build/shine.abi
 ```
 
-##### Testing
+#### Testing
+
+First, install [eos-bios](https://github.com/eoscanada/eos-bios) then follow
+the [local-development-environment](https://github.com/eoscanada/eos-bios#local-development-environment)
+instructions to start a local `nodeos` for development.
+
+Ensure that your `boot_sequence.yaml` contains the following content: (the content must comes
+before the `Replacing eosio account from eosio.bios contract to eosio.system` block):
+
+```
+- op: system.newaccount
+  label: Create account eosioforum
+  data:
+    creator: eosio
+    new_account: shine
+    pubkey: EOS5MHPYyhjBjnQZejzZHqHewPWhGTfQWSVTWYEhDmJu4SXkzgweP
+
+- op: system.newaccount
+  label: Create user account for shine
+  data:
+    creator: eosio
+    new_account: matt
+    pubkey: EOS5MHPYyhjBjnQZejzZHqHewPWhGTfQWSVTWYEhDmJu4SXkzgweP
+
+- op: system.newaccount
+  label: Create user account for shine
+  data:
+    creator: eosio
+    new_account: eve
+    pubkey: EOS5MHPYyhjBjnQZejzZHqHewPWhGTfQWSVTWYEhDmJu4SXkzgweP
+
+- op: system.newaccount
+  label: Create user account for shine
+  data:
+    creator: eosio
+    new_account: evan
+    pubkey: EOS5MHPYyhjBjnQZejzZHqHewPWhGTfQWSVTWYEhDmJu4SXkzgweP
+
+- op: system.newaccount
+  label: Create user account for shine
+  data:
+    creator: eosio
+    new_account: mike
+    pubkey: EOS5MHPYyhjBjnQZejzZHqHewPWhGTfQWSVTWYEhDmJu4SXkzgweP
+```
+
+Import the following private key in your wallet: `5JpjqdhVCQTegTjrLtCSXHce7c9M8w7EXYZS7xC13jVFF4Phcrx`
+(this is the private key for the public one `EOS5MHPYyhjBjnQZejzZHqHewPWhGTfQWSVTWYEhDmJu4SXkzgweP`, of
+course, you can use your own pair if you change the public key part in the boot sequence).
 
 To make it easier to develop, the `shine_bot.rb` is a small command line
-utility to interact more easily with the SmartContract.
+utility to interact more easily with the smart contract.
 
 First, it's possible to run all command in a quick way by passing the flag
 `-q` to the CLI tool. This will not ask for question for which a default value
@@ -133,20 +132,20 @@ the `member_id` being pass to the contract.
 
 Possible usage:
 
-* `./shine_bot.rb --praise` - Perform a praise (author, praisee, memo)
+* `./shine_bot.rb --post` - Perform a post (from, to, memo)
 * `./shine_bot.rb --vote` - Perform a vote (praise_id, voter)
-* `./shine_bot.rb --rewards` - Compute the rewards (pot)
-* `./shine_bot.rb --scenario` - Perform a scenario adding 6 praises and 10 votes.
+* `./shine_bot.rb --reset` - Reset the all state to initial values
+* `./shine_bot.rb --scenario` - Perform a scenario adding 6 posts and 10 votes.
 
 By using the scenario, you will automatically add a bunch of praises and
-votes so it's easier to test your SmartContract code and changes afterward.
+votes so it's easier to test your smart contract code and changes afterward.
 
-### EOS SmartContract
+### EOS smart contract
 
 #### References
 
 This section aims at providing links to documentation related to some concept
-of building SmartContract for the EOS blockchain.
+of building smart contract for the EOS blockchain.
 
 * `eosio::multi_index`
 

@@ -5,5 +5,6 @@ eosc-vault.json
 Makefile
 .envrc
 
+build*/
 CMakeFiles/
 .vscode/

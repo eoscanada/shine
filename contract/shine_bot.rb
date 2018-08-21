@@ -5,6 +5,7 @@ require 'json'
 require 'open3'
 require 'tty-prompt'
 
+DEBUG = ENV['DEBUG'] || false
 EOS_NAME_REGEX = /^[\.1-5a-z]{1,12}[\.a-p]?$/
 
 def main(arguments)
@@ -20,7 +21,7 @@ def main(arguments)
 end
 
 def ask_contract(prompt)
-  default = ENV['CONTRACT_ACCOUNT']
+  default = ENV['SHINE_BOT_CONTRACT']
   return default if default
 
   prompt.ask('Contract:') do |question|
@@ -196,6 +197,8 @@ def execute_cleos(arguments)
   options = []
   options << '--wallet-port' << wallet_port if wallet_port
   options << '--wallet-host' << wallet_host if wallet_host
+
+  puts 'cleos', *options, *arguments if DEBUG
 
   stdout, stderr, status = Open3.capture3('cleos', *options, *arguments)
   unless status.success?

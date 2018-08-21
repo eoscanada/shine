@@ -11,7 +11,7 @@
 #include "table.hpp"
 
 // Configurable values
-#define REWARD_post_count_WEIGHT 0.07
+#define REWARD_POST_COUNT_WEIGHT 0.07
 #define REWARD_VOTE_RECEIVED_WEIGHT 0.9
 #define REWARD_VOTE_GIVEN_WEIGHT 0.03
 

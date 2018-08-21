@@ -173,9 +173,9 @@ void shine::distribute_rewards(const asset& pot, distribution_stat& distribution
     auto post_count_weight = post_vote_received / (double)distribution.vote_explicit;
     auto vote_given_weight = vote_given_weighted / distribution.vote_given_weighted_total;
 
-    auto vote_received_amount = double_to_asset(vote_received_weight * pot_amount * REWARD_VOTE_RECEIVED_WEIGHT);
-    auto post_count_amount = double_to_asset(post_count_weight * pot_amount * REWARD_post_count_WEIGHT);
-    auto vote_given_amount = double_to_asset(vote_given_weight * pot_amount * REWARD_VOTE_GIVEN_WEIGHT);
+    auto vote_received_amount = double_to_asset(vote_received_weight * pot_amount * REWARD_VOTE_RECEIVED_WEIGHT, EOS_SYMBOL);
+    auto post_count_amount = double_to_asset(post_count_weight * pot_amount * REWARD_POST_COUNT_WEIGHT, EOS_SYMBOL);
+    auto vote_given_amount = double_to_asset(vote_given_weight * pot_amount * REWARD_VOTE_GIVEN_WEIGHT, EOS_SYMBOL);
     auto amount_total = vote_received_amount + post_count_amount + vote_given_amount;
 
     balance -= amount_total;

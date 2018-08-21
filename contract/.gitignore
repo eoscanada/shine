@@ -1,5 +1,9 @@
-*.wast
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+eosc-vault.json
+Makefile
+.envrc
 
-/.env
-
-.idea
+CMakeFiles/
+.vscode/

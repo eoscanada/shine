@@ -1,5 +1,8 @@
 {
   "types": [{
+    "new_type_name": "account_name",
+    "type": "name"
+  },{
     "new_type_name": "post_id",
     "type": "uint64"
   }],

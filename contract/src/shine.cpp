@@ -9,7 +9,7 @@
  * Each time a new action is added, EOSIO_API definition should be expanded with the
  * new action handler's method name.
  */
-extern "C" {
+/* extern "C" {
 void apply(uint64_t receiver, uint64_t code, uint64_t action) {
   auto self = receiver;
   if (code == self) {
@@ -32,12 +32,12 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
   }
 }
 }
-
+ */
 ///
 //// Actions
 ///
 
-void shine::post(const account_name from, const account_name to, const string& memo) {
+void shine::post(const name from, const name to, const string& memo) {
   require_active_auth(from);
 
   auto post_itr = posts.emplace(_self, [&](auto& post) {
@@ -51,11 +51,11 @@ void shine::post(const account_name from, const account_name to, const string& m
   update_member_stat(to, [](auto& stat) { stat.vote_received_implicit += 1; });
 }
 
-void shine::vote(const account_name voter, const post_id post_id) {
+void shine::vote(const name voter, const post_id post_id) {
   require_active_auth(voter);
 
   auto post_itr = posts.find(post_id);
-  eosio_assert(post_itr != posts.end(), "post with this id does not exist.");
+  check(post_itr != posts.end(), "post with this id does not exist.");
 
   votes.emplace(_self, [&](auto& vote) {
     vote.id = votes.available_primary_key();
@@ -75,10 +75,10 @@ void shine::vote(const account_name voter, const post_id post_id) {
 void shine::reset(const uint64_t any) {
   require_active_auth(_self);
 
-  table::clear(posts);
-  table::clear(votes);
-  table::clear(stats);
-  table::clear(rewards);
+  table_clear(posts);
+  table_clear(votes);
+  table_clear(stats);
+  table_clear(rewards);
 }
 
 ///
@@ -88,13 +88,20 @@ void shine::reset(const uint64_t any) {
 /**
  * Transfer the actual pot into rewards to all members.
  */
-void shine::transfer(const asset& pot) {
-  compute_rewards(pot);
-  eosio_assert(has_rewards(), "Cannot transfer pot without any rewards.");
+void shine::on_transfer(const name from, const name to, const asset quantity, const string& memo) {
+  compute_rewards(quantity);
+  check(has_rewards(), "Cannot transfer pot without any rewards.");
+
+  struct token_transfer {
+    name from;
+    name to;
+    asset quantity;
+    string memo;
+  };
 
   for_each(rewards.begin(), rewards.end(), [&](auto& reward) {
-    eosio::token_transfer transfer{_self, reward.account, reward.amount_total, "From Shine"};
-    eosio::action(permission_level{_self, N(active)}, N(eosio.token), N(transfer), transfer).send();
+    token_transfer transfer{_self, reward.account, reward.amount_total, "Shine on you!"};
+    eosio::action(permission_level{_self, "active"_n}, "eosio.token"_n, "transfer"_n, transfer).send();
   });
 }
 
@@ -130,17 +137,17 @@ void shine::transfer(const asset& pot) {
  * the remainder.
  */
 void shine::compute_rewards(const asset& pot) {
-  eosio_assert(pot.amount > 0, "Pot quantity must be higher than 0.");
+  check(pot.amount > 0, "Pot quantity must be higher than 0.");
 
-  table::clear(rewards);
+  table_clear(rewards);
 
   distribution_stat distribution;
 
   compute_global_stats(distribution);
   distribute_rewards(pot, distribution);
 
-  eosio_assert(distribution.distributed_pot.amount == pot.amount,
-               "Distributed pot should be equivalent to actual pot.");
+  check(distribution.distributed_pot.amount == pot.amount,
+        "Distributed pot should be equivalent to actual pot.");
 }
 
 void shine::compute_global_stats(distribution_stat& distribution) {
@@ -198,8 +205,8 @@ void shine::distribute_rewards(const asset& pot, distribution_stat& distribution
 //// Helpers
 ///
 
-void shine::update_reward_for_member(const account_name account, const function<void(reward_row&)> updater) {
-  auto reward_itr = rewards.find(account);
+void shine::update_reward_for_member(const name account, const function<void(reward_row&)> updater) {
+  auto reward_itr = rewards.find(account.value);
   if (reward_itr == rewards.end()) {
     rewards.emplace(_self, [&](auto& reward) {
       reward.account = account;
@@ -210,8 +217,8 @@ void shine::update_reward_for_member(const account_name account, const function<
   }
 }
 
-void shine::update_member_stat(const account_name account, const function<void(member_stat_row&)> updater) {
-  auto stat_itr = stats.find(account);
+void shine::update_member_stat(const name account, const function<void(member_stat_row&)> updater) {
+  auto stat_itr = stats.find(account.value);
   if (stat_itr == stats.end()) {
     stats.emplace(_self, [&](auto& stat) {
       stat.account = account;

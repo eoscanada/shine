@@ -1,17 +1,23 @@
+Downloading content from "../build/shine.abi".
 Downloading content from "./eosio.token.wasm".
 Downloading content from "../build/shine.wasm".
-Downloading content from "../build/shine.abi".
-Downloading content from "./eosio.token.abi".
-Caching content from "./eosio.token.wasm".
-- "./eosio.token.wasm" done
-Caching content from "./eosio.token.abi".
-Caching content from "../build/shine.wasm".
 Caching content from "../build/shine.abi".
-- "./eosio.token.abi" done
-- "../build/shine.wasm" done
+Downloading content from "https://abourget.keybase.pub/eos-bios-mainnet-data/eosio.bios.abi".
+Downloading content from "./eosio.token.abi".
+Downloading content from "https://abourget.keybase.pub/eos-bios-mainnet-data/eosio.bios.wasm".
+Caching content from "./eosio.token.wasm".
+Caching content from "../build/shine.wasm".
+Caching content from "./eosio.token.abi".
+- "./eosio.token.wasm" done
 - "../build/shine.abi" done
+- "../build/shine.wasm" done
+- "./eosio.token.abi" done
+Caching content from "https://abourget.keybase.pub/eos-bios-mainnet-data/eosio.bios.wasm".
+- "https://abourget.keybase.pub/eos-bios-mainnet-data/eosio.bios.wasm" done
+Caching content from "https://abourget.keybase.pub/eos-bios-mainnet-data/eosio.bios.abi".
+- "https://abourget.keybase.pub/eos-bios-mainnet-data/eosio.bios.abi" done
 START BOOT SEQUENCE...
-Using preset key:
+Using user provider custom ephemeral keys from boot sequence:
 
 	Public key: EOS5MHPYyhjBjnQZejzZHqHewPWhGTfQWSVTWYEhDmJu4SXkzgweP
 	Private key: 5Jpj..hcrx
@@ -71,7 +77,9 @@ Receiving block height=5 producer=eosio transactions=0
 .
 Receiving block height=6 producer=eosio transactions=0
 .
-Receiving block height=7 producer=eosio transactions=9
+Receiving block height=7 producer=eosio transactions=0
+.
+Receiving block height=8 producer=eosio transactions=9
 - Validating action 1/12 [eosio::setcode]
  valid.
 - Validating action 2/12 [eosio::setabi]

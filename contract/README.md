@@ -21,6 +21,9 @@ TBC
 * `vote` (`addvote`) - Vote for a given praise in the blockchain.
 * `rewards` (`calcrewards`) - Update the rewards table in the blockchain.
 
+* `register`  require_auth_self(_) members table (first key use "account)"
+* `unregister` require_auth_self(_)
+
 ### Development
 
 #### Prerequisites

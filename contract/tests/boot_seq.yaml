@@ -1,0 +1,86 @@
+keys:
+  ephemeral: 5JpjqdhVCQTegTjrLtCSXHce7c9M8w7EXYZS7xC13jVFF4Phcrx   #  EOS5MHPYyhjBjnQZejzZHqHewPWhGTfQWSVTWYEhDmJu4SXkzgweP
+
+contents:
+  - name: eosio.bios.abi
+    url: https://abourget.keybase.pub/eos-bios-mainnet-data/eosio.bios.abi
+    hash: b7314143acff25f700466824d23ce44d71e278400109c052b48dc51bb86e0290
+    comment: "~v1.0.2 from github.com/EOS-Mainnet/eos"
+  - name: eosio.bios.wasm
+    url: https://abourget.keybase.pub/eos-bios-mainnet-data/eosio.bios.wasm
+    hash: 5e8e655a05b34e782467684d7148244404b591a6c1ec2687eacb268926a37e59
+    comment: "~v1.0.2 from github.com/EOS-Mainnet/eos"
+
+  - name: eosio.token.abi
+    url: ./eosio.token.abi
+    comment: "extract from eosmainnet vs eosc 2019-12-10"
+  - name: eosio.token.wasm
+    url: ./eosio.token.wasm
+    comment: "extract from eosmainnet vs eosc 2019-12-10"
+
+## Target Contracts
+
+  - name: shine.wasm
+    url: ../build/shine.wasm
+  - name: shine.abi
+    url: ../build/shine.abi
+
+################################# BOOT SEQUENCE ###################################
+
+boot_sequence:
+- op: system.setcode
+  label: Setting eosio.bios code for account eosio
+  data:
+    account: eosio
+    contract_name_ref: eosio.bios
+- op: system.newaccount
+  label: Create account eosio.token (main multi-currency contract, including EOS)
+  data:
+    creator: eosio
+    new_account: eosio.token
+    pubkey: ephemeral
+- op: system.setcode
+  label: Setting eosio.token code for account eosio.token
+  data:
+    account: eosio.token
+    contract_name_ref: eosio.token
+- op: token.create
+  label: Creating the EOS currency symbol
+  data:
+    account: eosio
+    amount: 10000000000.0000 EOS  # Should work with 5% inflation, for the next 50 years (end of uint32 block_num anyway)
+- op: token.issue
+  label: Issuing initial EOS monetary base
+  data:
+    account: eosio
+    amount: 1000011821.0000 EOS  # 1B coins, as per distribution model + gift of RAM to new users.
+    memo: "Creation of EOS. Credits and Acknowledgments: eosacknowledgments.io"
+
+### Test setup
+
+- op: system.newaccount
+  label: Create account eosio.shine
+  data:
+    creator: eosio
+    new_account: shine
+    pubkey: ephemeral
+
+- op: system.setcode
+  label: Setting shine code for account shine
+  data:
+    account: shine
+    contract_name_ref: shine
+
+- op: system.newaccount
+  label: Create test account for shine
+  data:
+    creator: eosio
+    new_account: testaccount1
+    pubkey: ephemeral
+
+- op: system.newaccount
+  label: Create test account 2 for shine
+  data:
+    creator: eosio
+    new_account: testaccount2
+    pubkey: ephemeral

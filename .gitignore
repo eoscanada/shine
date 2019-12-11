@@ -1,3 +1,6 @@
 /contract/build/
-/.vscode
+/.vscode/*
 /.idea*
+*.wast
+.idea
+/.env

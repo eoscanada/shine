@@ -37,10 +37,11 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
  public:
   shine(name receiver, name code, datastream<const char*> ds)
         :eosio::contract(receiver, code, ds),
-        posts(code, code.value),
-        votes(code, code.value),
-        stats(code, code.value),
-        rewards(code, code.value)
+        votes(_self, _self.value),
+        stats(_self, _self.value),
+        posts(_self, _self.value),
+        members(_self, _self.value),
+        rewards(_self, _self.value)
         {}
 
   // Actions
@@ -48,6 +49,10 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
   void post(const name from, const name to, const string& memo);
   [[eosio::action]]
   void vote(const name voter, const post_id post_id);
+  [[eosio::action]]
+  void regaccount(const name account);
+  [[eosio::action]]
+  void unregaccount(const name account);
   [[eosio::action]]
   void reset(const uint64_t any);
 
@@ -83,6 +88,18 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
   };
 
   typedef eosio::multi_index<"votes"_n, vote_row> votes_index;
+
+  struct [[eosio::table]] member_row {
+    name account;
+    
+    uint64_t primary_key() const { return account.value; }
+
+    void print() const { eosio::print("Member (", eosio::name{account}, ")"); }
+    
+    EOSLIB_SERIALIZE(member_row, (account))
+  };
+
+  typedef eosio::multi_index<"members"_n, member_row> members_index;
 
   /**
    * post_count - The post count posted by the member
@@ -161,9 +178,12 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
   void require_active_auth(const name account) const { require_auth(permission_level{account, "active"_n}); }
   void update_member_stat(const name account, const function<void(member_stat_row&)> updater);
   void update_reward_for_member(const name account, const function<void(reward_row&)> updater);
+  void register_member(const name account);
+  void unregister_member(const name account);
 
   posts_index posts;
   votes_index votes;
   member_stats_index stats;
   rewards_index rewards;
+  members_index members;
 };

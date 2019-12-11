@@ -1,15 +1,15 @@
-Downloading content from "./eosio.token.wasm".
 Downloading content from "../build/shine.wasm".
 Downloading content from "../build/shine.abi".
 Downloading content from "./eosio.token.abi".
-Caching content from "./eosio.token.wasm".
-- "./eosio.token.wasm" done
-Caching content from "./eosio.token.abi".
-Caching content from "../build/shine.wasm".
+Downloading content from "./eosio.token.wasm".
 Caching content from "../build/shine.abi".
-- "./eosio.token.abi" done
-- "../build/shine.wasm" done
+Caching content from "../build/shine.wasm".
+Caching content from "./eosio.token.abi".
+Caching content from "./eosio.token.wasm".
 - "../build/shine.abi" done
+- "../build/shine.wasm" done
+- "./eosio.token.wasm" done
+- "./eosio.token.abi" done
 START BOOT SEQUENCE...
 Using preset key:
 
@@ -71,7 +71,59 @@ Receiving block height=5 producer=eosio transactions=0
 .
 Receiving block height=6 producer=eosio transactions=0
 .
-Receiving block height=7 producer=eosio transactions=9
+Receiving block height=7 producer=eosio transactions=0
+.
+Receiving block height=8 producer=eosio transactions=0
+.
+Receiving block height=9 producer=eosio transactions=0
+.
+Receiving block height=10 producer=eosio transactions=0
+.
+Receiving block height=11 producer=eosio transactions=0
+.
+Receiving block height=12 producer=eosio transactions=0
+.
+Receiving block height=13 producer=eosio transactions=0
+.
+Receiving block height=14 producer=eosio transactions=0
+.
+Receiving block height=15 producer=eosio transactions=0
+.
+Receiving block height=16 producer=eosio transactions=0
+.
+Receiving block height=17 producer=eosio transactions=0
+.
+Receiving block height=18 producer=eosio transactions=0
+.
+Receiving block height=19 producer=eosio transactions=0
+.
+Receiving block height=20 producer=eosio transactions=0
+.
+Receiving block height=21 producer=eosio transactions=0
+.
+Receiving block height=22 producer=eosio transactions=0
+.
+Receiving block height=23 producer=eosio transactions=0
+.
+Receiving block height=24 producer=eosio transactions=0
+.
+Receiving block height=25 producer=eosio transactions=0
+.
+Receiving block height=26 producer=eosio transactions=0
+.
+Receiving block height=27 producer=eosio transactions=0
+.
+Receiving block height=28 producer=eosio transactions=0
+.
+Receiving block height=29 producer=eosio transactions=0
+.
+Receiving block height=30 producer=eosio transactions=0
+.
+Receiving block height=31 producer=eosio transactions=0
+.
+Receiving block height=32 producer=eosio transactions=0
+.
+Receiving block height=33 producer=eosio transactions=9
 - Validating action 1/12 [eosio::setcode]
  valid.
 - Validating action 2/12 [eosio::setabi]

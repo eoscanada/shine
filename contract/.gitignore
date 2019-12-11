@@ -1,5 +1,10 @@
 *.wast
+.idea
 
 /.env
 
-.idea
+/tests/blocks
+/tests/protocol_features
+/tests/snapshpots
+/tests/state
+/tests/output.log

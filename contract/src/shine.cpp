@@ -68,12 +68,26 @@ void shine::vote(const name voter, const post_id post_id) {
   update_member_stat(post_itr->from, [](auto& stat) { stat.post_vote_received += 1; });
 }
 
+void shine::regaccount(const name account){
+  eosio::print("shine - regaccount\n");
+  require_active_auth(_self);
+
+  register_member(account);
+}
+
+void shine::unregaccount(const name account){
+  eosio::print("shine - unregaccount\n");
+  require_active_auth(_self);
+
+  unregister_member(account);
+}
+
 /**
  * Reset statistics for posts, votes, stats and rewards. Mapping between
  * member and account will be kept.
  */
 void shine::reset(const uint64_t any) {
-  eosio::print("shine - reset");
+  eosio::print("shine - reset\n");
   require_active_auth(_self);
   table_clear(posts);
   table_clear(votes);
@@ -236,5 +250,22 @@ void shine::update_member_stat(const name account, const function<void(member_st
     });
   } else {
     stats.modify(stat_itr, _self, [&](auto& stat) { updater(stat); });
+  }
+}
+
+
+void shine::register_member(const name account) {
+  auto member_itr = members.find(account.value);
+  if (member_itr == members.end()) {
+    members.emplace(_self, [&](auto& member) {
+      member.account = account;
+    });
+  }
+}
+
+void shine::unregister_member(const name account) {
+  auto member_itr = members.find(account.value);
+  if (member_itr != members.end()) {
+    members.erase(member_itr);
   }
 }

@@ -19,7 +19,7 @@ func postRunE(cmd *cobra.Command, args []string) (err error) {
 	fmt.Println("to: ", to)
 	fmt.Println("memo: ", memo)
 	//chainID := make([]byte, 32, 32)
-	//api := eos.New("http://localhost:8888", chainID)
+	api := eos.New("http://localhost:8888", chainID)
 	//
 	//api.SetSigner(eos.NewWalletSigner(eos.New("http://localhost:6667", chainID), "default"))
 	//

@@ -18,12 +18,14 @@ docker run -d -ti --name "${CONTAINER_NAME}" \
        -p 127.0.0.1:8888:8888 -p 127.0.0.1:9876:9876 \
        ${NODEOS_IMAGE}:${NODEOS_TAG} \
        /usr/bin/nodeos --config-dir="/etc/nodeos" --data-dir="/data" --genesis-json="/etc/nodeos/genesis.json" --contracts-console 1> /dev/null
-       
+
 
 # Give time to Docker to boot up
 
 echo "waiting for ready"
 sleep 3
+
+export EOSC_GLOBAL_INSECURE_VAULT_PASSPHRASE=secure
 
 pushd $ROOT
 eosc --debug -u http://localhost:8888 boot boot_seq.yaml 1> /tmp/${CONTAINER_NAME}-eos-bios-boot.log
@@ -34,8 +36,6 @@ echo " API URL: http://localhost:9898"
 echo " Info: eosc -u http://localhost:9898 get info"
 echo " Logs: docker logs -f ${CONTAINER_NAME}"
 echo ""
-
-export EOSC_GLOBAL_INSECURE_VAULT_PASSPHRASE=secure
 
 echo "Create testaccount3"
 eosc -u http://localhost:8888 system newaccount testaccount1 testaccount3 --auth-key=EOS5MHPYyhjBjnQZejzZHqHewPWhGTfQWSVTWYEhDmJu4SXkzgweP --stake-cpu=10 --stake-net=10
@@ -48,4 +48,3 @@ eosc -u http://localhost:8888 tx create shine vote '{"voter":"testaccount3","pos
 
 
 popd
-

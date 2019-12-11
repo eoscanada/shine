@@ -172,7 +172,12 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
   void compute_global_stats(distribution_stat& distribution);
   void distribute_rewards(const asset& pot, distribution_stat& distribution);
 
-  member_stats_index::const_iterator find_last_stats_member_itr() { return stats.end()--; }
+  member_stats_index::const_iterator find_last_stats_member_itr() {
+    if (stats.begin() == stats.end()) {
+      return stats.end();
+    }
+    return stats.end()--;
+  }
 
   bool has_rewards() const { return rewards.begin() != rewards.end(); }
   void require_active_auth(const name account) const { require_auth(permission_level{account, "active"_n}); }

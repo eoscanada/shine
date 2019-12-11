@@ -103,28 +103,25 @@ void shine::reset(const uint64_t any) {
  * Transfer the actual pot into rewards to all members.
  */
 void shine::on_transfer(const name from, const name to, const asset quantity, const string& memo) {
-  eosio::print("on transfer\n");
-  eosio::print(from);
-  eosio::print(to);
+
   if (to != _self) {
-    return; 
+    return;
   }
 
-  
   compute_rewards(quantity);
-  // check(has_rewards(), "Cannot transfer pot without any rewards.");
+  check(has_rewards(), "Cannot transfer pot without any rewards.");
 
-  // struct token_transfer {
-  //   name from;
-  //   name to;
-  //   asset quantity;
-  //   string memo;
-  // };
+  struct token_transfer {
+    name from;
+    name to;
+    asset quantity;
+    string memo;
+  };
 
-  // for_each(rewards.begin(), rewards.end(), [&](auto& reward) {
-  //   token_transfer transfer{_self, reward.account, reward.amount_total, "Shine on you!"};
-  //   eosio::action(permission_level{_self, "active"_n}, "eosio.token"_n, "transfer"_n, transfer).send();
-  // });
+  for_each(rewards.begin(), rewards.end(), [&](auto& reward) {
+    token_transfer transfer{_self, reward.account, reward.amount_total, "Shine on you!"};
+    eosio::action(permission_level{_self, "active"_n}, "eosio.token"_n, "transfer"_n, transfer).send();
+  });
 }
 
 /**
@@ -159,7 +156,6 @@ void shine::on_transfer(const name from, const name to, const asset quantity, co
  * the remainder.
  */
 void shine::compute_rewards(const asset& pot) {
-  eosio::print("computing rewards");
   check(pot.amount > 0, "Pot quantity must be higher than 0.");
   table_clear(rewards);
 
@@ -184,10 +180,8 @@ void shine::compute_global_stats(distribution_stat& distribution) {
 }
 
 void shine::distribute_rewards(const asset& pot, distribution_stat& distribution) {
-  eosio::print("distribution rewards");
   auto pot_amount = asset_to_double(pot);
   auto balance = pot;
-
 
   auto last_member_itr = find_last_stats_member_itr();
   for (auto itr = stats.begin(); itr != stats.end(); itr = itr++) {

@@ -96,6 +96,7 @@ void shine::reset(const uint64_t any) {
   table_clear(votes);
   table_clear(stats);
   table_clear(rewards);
+  table_clear(members);
 }
 
 ///

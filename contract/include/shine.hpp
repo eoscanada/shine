@@ -185,6 +185,7 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
   void update_reward_for_member(const name account, const function<void(reward_row&)> updater);
   void register_member(const name account);
   void unregister_member(const name account);
+  bool is_whitelisted(const name account);
 
   posts_index posts;
   votes_index votes;

@@ -40,6 +40,9 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
 void shine::post(const name from, const name to, const string& memo) {
   require_active_auth(from);
 
+
+  check(is_whitelisted(from), "From account: '" + from.to_string() + "' is not whitelisted");
+
   auto post_itr = posts.emplace(_self, [&](auto& post) {
     post.id = posts.available_primary_key();
     post.from = from;
@@ -247,6 +250,13 @@ void shine::update_member_stat(const name account, const function<void(member_st
   }
 }
 
+bool shine::is_whitelisted(const name account) {
+  auto member_itr = members.find(account.value);
+  if (member_itr != members.end()) {
+    return true;
+  }
+  return false;
+}
 
 void shine::register_member(const name account) {
   auto member_itr = members.find(account.value);

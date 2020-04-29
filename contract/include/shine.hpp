@@ -46,13 +46,14 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
 
   // Actions
   [[eosio::action]]
-  void post(const name from, const name to, const string& memo);
+  void post(const bool auth_owner, const name from, const name to, const string& memo);
   [[eosio::action]]
-  void vote(const name voter, const post_id post_id);
+  void vote(const bool auth_owner, const name voter, const post_id post_id);
+
   [[eosio::action]]
-  void regaccount(const name account);
+  void regaccount(const name shine_account, const name onchain_account, const string offchain_account);
   [[eosio::action]]
-  void unregaccount(const name account);
+  void unregaccount(const name shine_account);
   [[eosio::action]]
   void reset(const uint64_t any);
 
@@ -90,13 +91,15 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
   typedef eosio::multi_index<"votes"_n, vote_row> votes_index;
 
   struct [[eosio::table]] member_row {
-    name account;
-    
-    uint64_t primary_key() const { return account.value; }
+    name shine_account;  // Internal account ID
+    name onchain_account;
+    string offchain_account; // Some sort of hash of something off chain, like a salt + Slack e-mail or ID
 
-    void print() const { eosio::print("Member (", eosio::name{account}, ")"); }
-    
-    EOSLIB_SERIALIZE(member_row, (account))
+    uint64_t primary_key() const { return shine_account.value; }
+
+    void print() const { eosio::print("Member (", shine_account, ", ", eosio::name{onchain_account}, ", ", offchain_account , ")"); }
+
+    EOSLIB_SERIALIZE(member_row, (shine_account)(onchain_account)(offchain_account))
   };
 
   typedef eosio::multi_index<"members"_n, member_row> members_index;
@@ -183,8 +186,8 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
   void require_active_auth(const name account) const { require_auth(permission_level{account, "active"_n}); }
   void update_member_stat(const name account, const function<void(member_stat_row&)> updater);
   void update_reward_for_member(const name account, const function<void(reward_row&)> updater);
-  void register_member(const name account);
-  void unregister_member(const name account);
+  void register_member(const name shine_account, const name onchain_account, const string offchain_account);
+  void unregister_member(const name shine_account);
   bool is_whitelisted(const name account);
 
   posts_index posts;

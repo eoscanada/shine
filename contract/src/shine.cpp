@@ -37,9 +37,12 @@ void apply(uint64_t receiver, uint64_t code, uint64_t action) {
 //// Actions
 ///
 
-void shine::post(const name from, const name to, const string& memo) {
-  require_active_auth(from);
-
+void shine::post(const bool auth_owner, const name from, const name to, const string& memo) {
+  if (auth_owner) {
+    require_active_auth(_self);
+  } else {
+    require_active_auth(from);
+  }
 
   check(is_whitelisted(from), "From account: '" + from.to_string() + "' is not whitelisted");
 
@@ -54,8 +57,12 @@ void shine::post(const name from, const name to, const string& memo) {
   update_member_stat(to, [](auto& stat) { stat.vote_received_implicit += 1; });
 }
 
-void shine::vote(const name voter, const post_id post_id) {
-  require_active_auth(voter);
+void shine::vote(const bool auth_owner, const name voter, const post_id post_id) {
+  if (auth_owner) {
+    require_active_auth(_self);
+  } else {
+    require_active_auth(voter);
+  }
 
   auto post_itr = posts.find(post_id);
   check(post_itr != posts.end(), "post with this id does not exist.");
@@ -71,18 +78,18 @@ void shine::vote(const name voter, const post_id post_id) {
   update_member_stat(post_itr->from, [](auto& stat) { stat.post_vote_received += 1; });
 }
 
-void shine::regaccount(const name account){
+void shine::regaccount(const name shine_account, const name onchain_account, const string offchain_account){
   eosio::print("shine - regaccount\n");
   require_active_auth(_self);
 
-  register_member(account);
+  register_member(shine_account, onchain_account, offchain_account);
 }
 
-void shine::unregaccount(const name account){
+void shine::unregaccount(const name shine_account){
   eosio::print("shine - unregaccount\n");
   require_active_auth(_self);
 
-  unregister_member(account);
+  unregister_member(shine_account);
 }
 
 /**
@@ -259,17 +266,19 @@ bool shine::is_whitelisted(const name account) {
   return false;
 }
 
-void shine::register_member(const name account) {
-  auto member_itr = members.find(account.value);
+void shine::register_member(const name shine_account, const name onchain_account, const string offchain_account) {
+  auto member_itr = members.find(shine_account.value);
   if (member_itr == members.end()) {
     members.emplace(_self, [&](auto& member) {
-      member.account = account;
+      member.shine_account = shine_account;
+      member.onchain_account = onchain_account;
+      member.offchain_account = offchain_account;
     });
   }
 }
 
-void shine::unregister_member(const name account) {
-  auto member_itr = members.find(account.value);
+void shine::unregister_member(const name shine_account) {
+  auto member_itr = members.find(shine_account.value);
   if (member_itr != members.end()) {
     members.erase(member_itr);
   }

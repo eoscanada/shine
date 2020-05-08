@@ -1,109 +1,169 @@
 #include "shine.hpp"
 
-/**
- * SmartContract C entrypoint using a macro based on the list of action in the.
- * For each of defined action, a switch branch is added
- * automatically unpacking the data into the action's structure and dispatching
- * a method call to `action` define in this SmartContract.
- *
- * Each time a new action is added, EOSIO_API definition should be expanded with the
- * new action handler's method name.
- */
-/* extern "C" {
-void apply(uint64_t receiver, uint64_t code, uint64_t action) {
-  auto self = receiver;
-  if (code == self) {
-    // Don't rename `thiscontract`, it's being use verbatim in `EOSIO_API` macro
-    shine thiscontract(self);
-    switch (action) { EOSIO_API(shine, (post)(vote)(reset)) }
+///
+/// Actions
+///
 
-    eosio_exit(0);
-  }
+void shine::post(const name org, const bool org_auth, const name from, const name to, const string& memo) {
+  name payer;
+  if (org_auth) {
+    require_auth(org);
+    payer = org;
 
-  if (shine::is_token_transfer(code, action)) {
-    eosio::token_transfer action = unpack_action_data<eosio::token_transfer>();
-
-    // Only pass notification to shine if transfer `to` is shine contract account and `quantity` are EOS tokens
-    if (action.to == self && action.quantity.symbol == EOS_SYMBOL) {
-      shine(self).transfer(action.quantity);
+    // Register accounts only if it's the organization signing.
+    if (!shine_account_exists(org, from)) {
+      register_member(org, from, empty_name, "");
     }
-
-    eosio_exit(0);
-  }
-}
-}
- */
-///
-//// Actions
-///
-
-void shine::post(const bool auth_owner, const name from, const name to, const string& memo) {
-  if (auth_owner) {
-    require_active_auth(_self);
+    if (!shine_account_exists(org, to)) {
+      register_member(org, to, empty_name, "");
+    }
   } else {
-    require_active_auth(from);
+    require_auth(from);
+    payer = from;
   }
 
-  check(is_whitelisted(from), "From account: '" + from.to_string() + "' is not whitelisted");
+  configs_index configs(get_self(), org.value);
+  auto config = configs.find("config"_n.value);
+  check(config != configs.end(), "organization not configured");
 
-  auto post_itr = posts.emplace(_self, [&](auto& post) {
-    post.id = posts.available_primary_key();
+  configs.modify(config, eosio::same_payer, [&](auto& row) {
+    row.last_post_id++;
+  });
+
+  posts_index posts(get_self(), org.value);
+  auto post_itr = posts.emplace(payer, [&](auto& post) {
+    post.id = config->last_post_id;
     post.from = from;
     post.to = to;
     post.memo = memo;
   });
 
-  update_member_stat(from, [](auto& stat) { stat.post_count += 1; });
-  update_member_stat(to, [](auto& stat) { stat.vote_received_implicit += 1; });
+  update_weight(org, payer, from, [&](auto& row) { row.weight += config->poster_weight; });
+  update_weight(org, payer, to, [&](auto& row) { row.weight += config->recipient_weight; });
 }
 
-void shine::vote(const bool auth_owner, const name voter, const post_id post_id) {
-  if (auth_owner) {
-    require_active_auth(_self);
+void shine::vote(const name org, const bool org_auth, const name voter, const post_id post_id) {
+  name payer;
+  if (org_auth) {
+    require_auth(org);
+    payer = org;
+
+    // Register accounts only if it's the organization signing.
+    if (!shine_account_exists(org, voter)) {
+      register_member(org, voter, empty_name, "");
+    }
   } else {
-    require_active_auth(voter);
+    require_auth(voter);
+    payer = voter;
   }
 
+  posts_index posts(get_self(), org.value);
   auto post_itr = posts.find(post_id);
   check(post_itr != posts.end(), "post with this id does not exist.");
 
-  votes.emplace(_self, [&](auto& vote) {
-    vote.id = votes.available_primary_key();
-    vote.voter = voter;
-    vote.post_id = post_id;
+  uint64_t seenhash = post_id ^ voter.value; // simple hash (!)
+  seen_index seentable(get_self(), org.value);
+  auto seen_itr = seentable.find(seenhash);
+  check(seen_itr == seentable.end(), "voter already voted for that post");
+
+  seentable.emplace(payer, [&](auto& row) {
+    row.seenhash = seenhash;
   });
 
-  update_member_stat(voter, [](auto& stat) { stat.vote_given_explicit += 1; });
-  update_member_stat(post_itr->to, [](auto& stat) { stat.vote_received_explicit += 1; });
-  update_member_stat(post_itr->from, [](auto& stat) { stat.post_vote_received += 1; });
+  configs_index configs(get_self(), org.value);
+  auto config = configs.find("config"_n.value);
+  check(config != configs.end(), "organization not configured");
+
+  update_weight(org, payer, voter, [&](auto& row) { row.weight += config->voter_weight; });
+  update_weight(org, payer, post_itr->to, [&](auto& row) { row.weight += config->recipient_weight; });
+  update_weight(org, payer, post_itr->from, [&](auto& row) { row.weight += config->poster_weight; });
 }
 
-void shine::regaccount(const name shine_account, const name onchain_account, const string offchain_account){
+void shine::regaccount(const name org, const name shine_account, const name onchain_account, const string offchain_account){
   eosio::print("shine - regaccount\n");
-  require_active_auth(_self);
+  require_auth(org);
 
-  register_member(shine_account, onchain_account, offchain_account);
+  register_member(org, shine_account, onchain_account, offchain_account);
 }
 
-void shine::unregaccount(const name shine_account){
+void shine::unregaccount(const name org, const name shine_account){
   eosio::print("shine - unregaccount\n");
-  require_active_auth(_self);
+  require_auth(org);
 
-  unregister_member(shine_account);
+  unregister_member(org, shine_account);
 }
 
 /**
  * Reset statistics for posts, votes, stats and rewards. Mapping between
  * member and account will be kept.
  */
-void shine::reset(const uint64_t any) {
+void shine::reset(const name org) {
   eosio::print("shine - reset\n");
-  require_active_auth(_self);
+  require_auth(org);
+
+  posts_index posts(get_self(), org.value);
   table_clear(posts);
-  table_clear(votes);
-  table_clear(stats);
-  table_clear(rewards);
+
+  seen_index seentbl(get_self(), org.value);
+  table_clear(seentbl);
+
+  weights_index weights(get_self(), org.value);
+  auto itr = weights.begin();
+  while (itr != weights.end()) {
+    weights.modify(itr, eosio::same_payer, [&](auto& row) {
+      row.weight = 0;
+    });
+  }
+}
+
+/**
+ * `purgeall` is a system call authorized by the contract account, to remove all
+ * rows, including the configuration and members from an organization.
+ */
+void shine::purgeall(const name org) {
+  //check(false, "purge all disabled");
+
+  eosio::print("shine - purgeall\n");
+  require_auth(get_self());
+
+  posts_index posts(get_self(), org.value);
+  table_clear(posts);
+
+  seen_index seentbl(get_self(), org.value);
+  table_clear(seentbl);
+
+  weights_index weights(get_self(), org.value);
+  table_clear(weights);
+
+  members_index members(get_self(), org.value);
   table_clear(members);
+
+  configs_index configs(get_self(), org.value);
+  table_clear(configs);
+}
+
+void shine::configure(const name org, uint64_t recipient_weight, uint64_t voter_weight, uint64_t poster_weight) {
+  eosio::print("shine - configure\n");
+  // if config doesn't exist, create it
+  // otherwise, modify it
+  require_auth(org);
+
+  configs_index configs(get_self(), org.value);
+  auto config_itr = configs.find("config"_n.value);
+  if (config_itr == configs.end()) {
+    configs.emplace(org, [&](auto& row) {
+      row.last_post_id = 1024;
+      row.recipient_weight = recipient_weight;
+      row.voter_weight = voter_weight;
+      row.poster_weight = poster_weight;
+    });
+  } else {
+    configs.modify(config_itr, eosio::same_payer, [&](auto& row) {
+      row.recipient_weight = recipient_weight;
+      row.voter_weight = voter_weight;
+      row.poster_weight = poster_weight;
+    });
+  }
 }
 
 ///
@@ -114,13 +174,9 @@ void shine::reset(const uint64_t any) {
  * Transfer the actual pot into rewards to all members.
  */
 void shine::on_transfer(const name from, const name to, const asset quantity, const string& memo) {
-
   if (to != _self) {
     return;
   }
-
-  compute_rewards(quantity);
-  check(has_rewards(), "Cannot transfer pot without any rewards.");
 
   struct token_transfer {
     name from;
@@ -129,136 +185,28 @@ void shine::on_transfer(const name from, const name to, const asset quantity, co
     string memo;
   };
 
-  for_each(rewards.begin(), rewards.end(), [&](auto& reward) {
-    token_transfer transfer{_self, reward.account, reward.amount_total, "Shine on you!"};
-    eosio::action(permission_level{_self, "active"_n}, "eosio.token"_n, "transfer"_n, transfer).send();
-  });
+  // for_each(rewards.begin(), rewards.end(), [&](auto& reward) {
+  //   token_transfer transfer{_self, reward.account, reward.amount_total, "Shine on you!"};
+  //   eosio::action(permission_level{_self, "active"_n}, "eosio.token"_n, "transfer"_n, transfer).send();
+  // });
 }
 
-/**
- * The calculation of rewards follow a simple algorithm using as raw input
- * for each member:
- *  + The amount of vote received
- *  + The amount of vote given
- *  + The amount of post posted
- *
- * Base on these three values, a weight is computed for each of them:
- *  + Vote received -> Proportional to total vote count (explicit + implicit)
- *  + Vote given -> Proportional to total of vote given weight (1 vote -> 1/3, 2 votes -> 2/3, 2+ votes -> 3/3)
- *  + post posted -> Propotional to total explicite vote count.
- *
- * The algorithm first loop through all member stats to compute global
- * stats (total vote, total post, etc).
- *
- * Then, it computes the rewards for each member that has a bound EOS account.
- * The amount of distributed tokens is also being accumulated. When all member
- * has been processed, the undistributed pot is computed by doing `pot - distributed_pot`.
- *
- * If the undistributed pot is 0, the rewards computation stops here.
- *
- * If the undistributed pot is above 0, then there is two possibilites.
- *
- * First, if there is only one person to distribute the balance to if
- * it's impossible to divise further the undistributed pot to all bound
- * members, the balance is simply awarded to the first member.
- *
- * Else, the undistributed pot is spread evenly through all bound members,
- * if the undistributed pot cannot be split evenly, the last member receives
- * the remainder.
- */
-void shine::compute_rewards(const asset& pot) {
-  check(pot.amount > 0, "Pot quantity must be higher than 0.");
-  table_clear(rewards);
-
-  distribution_stat distribution;
-
-  compute_global_stats(distribution);
-  distribute_rewards(pot, distribution);
-
-  check(distribution.distributed_pot.amount == pot.amount,
-        "Distributed pot should be equivalent to actual pot.");
-}
-
-void shine::compute_global_stats(distribution_stat& distribution) {
-  for_each(stats.begin(), stats.end(), [&](auto& stat) {
-    auto postd_posted = stat.post_count;
-    auto vote_given = stat.vote_given_explicit;
-
-    distribution.vote_explicit += vote_given;
-    distribution.vote_total += postd_posted + vote_given;
-    distribution.vote_given_weighted_total += vote_given * compute_vote_given_weight(vote_given);
-  });
-}
-
-void shine::distribute_rewards(const asset& pot, distribution_stat& distribution) {
-  auto pot_amount = asset_to_double(pot);
-  auto balance = pot;
-
-  auto last_member_itr = find_last_stats_member_itr();
-  for (auto itr = stats.begin(); itr != stats.end(); itr = itr++) {
-    auto& stat = *itr;
-
-    auto vote_received = stat.vote_received_explicit + stat.vote_received_implicit;
-    auto post_vote_received = stat.post_vote_received;
-    auto vote_given = stat.vote_given_explicit;
-
-    auto vote_given_weights = compute_vote_given_weight(vote_given);
-    auto vote_given_weighted = vote_given * vote_given_weights;
-
-    auto vote_received_weight = vote_received / (double)distribution.vote_total;
-    auto post_count_weight = post_vote_received / (double)distribution.vote_explicit;
-    auto vote_given_weight = vote_given_weighted / distribution.vote_given_weighted_total;
-
-    auto vote_received_amount = double_to_asset(vote_received_weight * pot_amount * REWARD_VOTE_RECEIVED_WEIGHT);
-    auto post_count_amount = double_to_asset(post_count_weight * pot_amount * REWARD_post_count_WEIGHT);
-    auto vote_given_amount = double_to_asset(vote_given_weight * pot_amount * REWARD_VOTE_GIVEN_WEIGHT);
-    auto amount_total = vote_received_amount + post_count_amount + vote_given_amount;
-
-    balance -= amount_total;
-    if (itr == last_member_itr) {
-      amount_total += balance;
-    }
-
-    distribution.distributed_pot += amount_total;
-
-    update_reward_for_member(stat.account, [&](auto& reward) {
-      reward.amount_post_count = post_count_amount;
-      reward.amount_vote_received = vote_received_amount;
-      reward.amount_vote_given = vote_given_amount;
-      reward.amount_total = amount_total;
-    });
-  }
-}
 
 ///
 //// Helpers
 ///
 
-void shine::update_reward_for_member(const name account, const function<void(reward_row&)> updater) {
-  auto reward_itr = rewards.find(account.value);
-  if (reward_itr == rewards.end()) {
-    rewards.emplace(_self, [&](auto& reward) {
-      reward.account = account;
-      updater(reward);
-    });
-  } else {
-    rewards.modify(reward_itr, _self, [&](auto& reward) { updater(reward); });
-  }
+void shine::update_weight(const name org, const name payer, const name account, const function<void(weights_row&)> updater) {
+  weights_index weights(get_self(), org.value);
+
+  auto row_itr = weights.find(account.value);
+  check(row_itr != weights.end(), "account to update weight does not exist"); // TODO add the account name in there!
+
+  weights.modify(row_itr, eosio::same_payer, [&](auto& row) { updater(row); });
 }
 
-void shine::update_member_stat(const name account, const function<void(member_stat_row&)> updater) {
-  auto stat_itr = stats.find(account.value);
-  if (stat_itr == stats.end()) {
-    stats.emplace(_self, [&](auto& stat) {
-      stat.account = account;
-      updater(stat);
-    });
-  } else {
-    stats.modify(stat_itr, _self, [&](auto& stat) { updater(stat); });
-  }
-}
-
-bool shine::is_whitelisted(const name account) {
+bool shine::shine_account_exists(const name org, const name account) {
+  members_index members(get_self(), org.value);
   auto member_itr = members.find(account.value);
   if (member_itr != members.end()) {
     return true;
@@ -266,20 +214,40 @@ bool shine::is_whitelisted(const name account) {
   return false;
 }
 
-void shine::register_member(const name shine_account, const name onchain_account, const string offchain_account) {
+void shine::register_member(const name org, const name shine_account, const name onchain_account, const string offchain_account) {
+  members_index members(get_self(), org.value);
+  weights_index weights(get_self(), org.value);
+
   auto member_itr = members.find(shine_account.value);
-  if (member_itr == members.end()) {
-    members.emplace(_self, [&](auto& member) {
+  if (member_itr != members.end()) {
+    members.modify(member_itr, eosio::same_payer, [&](auto& member) {
+      member.onchain_account = onchain_account;
+      member.offchain_account = offchain_account;
+    });
+  } else {
+    members.emplace(org, [&](auto& member) {
       member.shine_account = shine_account;
       member.onchain_account = onchain_account;
       member.offchain_account = offchain_account;
     });
+    weights.emplace(org, [&](auto& row) {
+      row.shine_account = shine_account;
+      row.weight = 0;
+    });
   }
 }
 
-void shine::unregister_member(const name shine_account) {
+void shine::unregister_member(const name org, const name shine_account) {
+  members_index members(get_self(), org.value);
+  weights_index weights(get_self(), org.value);
+
   auto member_itr = members.find(shine_account.value);
   if (member_itr != members.end()) {
     members.erase(member_itr);
+  }
+
+  auto weight_itr = weights.find(shine_account.value);
+  if (weight_itr != weights.end()) {
+    weights.erase(weight_itr);
   }
 }

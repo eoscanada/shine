@@ -18,8 +18,10 @@ void shine::post(const name org, const bool org_auth, const name from, const nam
       register_member(org, to, empty_name, "");
     }
   } else {
-    require_auth(from);
-    payer = from;
+    check(false, "authenticating shine accounts for posting not supported yet");
+    // name onchain_account = get_onchain_account_for_shine_account(org, voter);
+    // require_auth(onchain_account);
+    // payer = onchain_account;
   }
 
   configs_index configs(get_self(), org.value);
@@ -53,8 +55,9 @@ void shine::vote(const name org, const bool org_auth, const name voter, const po
       register_member(org, voter, empty_name, "");
     }
   } else {
-    require_auth(voter);
-    payer = voter;
+    name onchain_account = get_onchain_account_for_shine_account(org, voter);
+    require_auth(onchain_account);
+    payer = onchain_account;
   }
 
   posts_index posts(get_self(), org.value);
@@ -203,6 +206,14 @@ void shine::update_weight(const name org, const name payer, const name account, 
   check(row_itr != weights.end(), "account to update weight does not exist"); // TODO add the account name in there!
 
   weights.modify(row_itr, eosio::same_payer, [&](auto& row) { updater(row); });
+}
+
+name shine::get_onchain_account_for_shine_account(const name org, const name account) {
+  members_index members(get_self(), org.value);
+  auto member_itr = members.find(account.value);
+  check(member_itr != members.end(), "shine account not found");
+  check(member_itr->onchain_account != empty_name, "no registered onchain account for the given shine account");
+  return member_itr->onchain_account;
 }
 
 bool shine::shine_account_exists(const name org, const name account) {

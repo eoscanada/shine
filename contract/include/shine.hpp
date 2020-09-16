@@ -148,4 +148,5 @@ class [[eosio::contract("shine")]] shine : public eosio::contract {
   void register_member(const name org, const name shine_account, const name onchain_account, const string offchain_account);
   void unregister_member(const name org, const name shine_account);
   bool shine_account_exists(const name org, const name account);
+  name get_onchain_account_for_shine_account(const name org, const name account);
 };

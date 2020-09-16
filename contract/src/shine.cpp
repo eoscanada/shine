@@ -62,7 +62,8 @@ void shine::regaccount(const name account, const string slack_id){
   eosio::print("shine - regaccount\n");
   auto self = get_self();
 
-  require_auth(self);;
+  require_auth(self);
+  check( is_account(account), "account does not exist on chain, create it first");
 
   members_index members(self, self.value);
   weights_index weights(self, self.value);
